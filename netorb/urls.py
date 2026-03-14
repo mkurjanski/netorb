@@ -8,6 +8,7 @@ router.register("interfaces", views.InterfaceViewSet, basename="interface")
 router.register("routes", views.IPv4RouteViewSet, basename="route")
 
 urlpatterns = [
+    path("", views.home, name="home"),
     path("logs/", views.log_page, name="log-page"),
     path("logs/stream/", views.log_stream, name="log-stream"),
     path("api/", include(router.urls)),

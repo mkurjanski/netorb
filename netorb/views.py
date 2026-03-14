@@ -8,7 +8,9 @@ from django.views.decorators.http import require_GET
 from rest_framework import filters
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
-from .models import Interface, IPv4Route, TaskLog
+from django.db.models import Count, Q
+
+from .models import Device, Interface, IPv4Route, TaskLog
 from .serializers import InterfaceSerializer, IPv4RouteSerializer
 
 class InterfaceViewSet(ReadOnlyModelViewSet):
@@ -63,6 +65,24 @@ class IPv4RouteViewSet(ReadOnlyModelViewSet):
 
 _SSE_TIMEOUT_SECONDS = 120
 _SSE_POLL_INTERVAL = 1
+
+
+@login_required
+def home(request):
+    devices = Device.objects.annotate(
+        interface_count=Count("interface", distinct=True),
+        interfaces_up=Count("interface", filter=Q(interface__oper_status="UP"), distinct=True),
+        route_count=Count("ipv4route", distinct=True),
+    ).order_by("hostname")
+
+    context = {
+        "device_count": Device.objects.count(),
+        "interface_count": Interface.objects.count(),
+        "interfaces_up": Interface.objects.filter(oper_status="UP").count(),
+        "route_count": IPv4Route.objects.count(),
+        "devices": devices,
+    }
+    return render(request, "netorb/home.html", context)
 
 
 @login_required

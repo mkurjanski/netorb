@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>netorb</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body { background: #0d1117; color: #c9d1d9; font-family: monospace; font-size: 13px; }
+
+    header {
+      display: flex; align-items: center; gap: 1rem;
+      padding: .75rem 1.25rem; background: #161b22; border-bottom: 1px solid #30363d;
+    }
+    header h1 { font-size: 1rem; font-weight: 600; }
+
+    nav {
+      display: flex; gap: .5rem;
+      padding: .5rem 1.25rem; background: #161b22; border-bottom: 1px solid #30363d;
+    }
+    nav a {
+      color: #58a6ff; text-decoration: none;
+      padding: .2rem .6rem; border-radius: 4px;
+    }
+    nav a:hover { background: #21262d; }
+
+    main { padding: 1.5rem 1.25rem; }
+
+    .stats {
+      display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 2rem;
+    }
+    .stat-card {
+      background: #161b22; border: 1px solid #30363d; border-radius: 6px;
+      padding: 1rem 1.5rem; min-width: 140px;
+    }
+    .stat-card .label { color: #8b949e; font-size: .75rem; margin-bottom: .4rem; }
+    .stat-card .value { font-size: 1.75rem; font-weight: 700; }
+
+    h2 { font-size: .75rem; color: #8b949e; margin-bottom: .75rem; letter-spacing: .08em; text-transform: uppercase; }
+
+    table { width: 100%; border-collapse: collapse; margin-bottom: 2rem; }
+    th {
+      text-align: left; padding: .4rem .75rem;
+      background: #161b22; color: #8b949e;
+      border-bottom: 1px solid #30363d; font-weight: 600;
+    }
+    td { padding: .4rem .75rem; border-bottom: 1px solid #21262d; }
+    tr:hover td { background: #161b22; }
+
+    .badge {
+      display: inline-block; padding: .1rem .45rem;
+      border-radius: 3px; font-size: .75rem; font-weight: 600;
+    }
+    .badge-up      { background: #0d3a1e; color: #3fb950; }
+    .badge-down    { background: #2d1a1a; color: #f85149; }
+    .badge-unknown { background: #21262d; color: #8b949e; }
+
+    .empty { color: #484f58; }
+    .empty a { color: #58a6ff; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>netorb</h1>
+</header>
+
+<nav>
+  <a href="/">Home</a>
+  <a href="/logs/">Logs</a>
+  <a href="/admin/">Admin</a>
+</nav>
+
+<main>
+  <div class="stats">
+    <div class="stat-card">
+      <div class="label">Devices</div>
+      <div class="value">{{ device_count }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Interfaces</div>
+      <div class="value">{{ interface_count }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Interfaces Up</div>
+      <div class="value" style="color:#3fb950">{{ interfaces_up }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Routes</div>
+      <div class="value">{{ route_count }}</div>
+    </div>
+  </div>
+
+  <h2>Devices</h2>
+
+  {% if devices %}
+  <table>
+    <thead>
+      <tr>
+        <th>Hostname</th>
+        <th>Interfaces</th>
+        <th>Up</th>
+        <th>Routes</th>
+        <th>Updated</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for d in devices %}
+      <tr>
+        <td>{{ d.hostname }}</td>
+        <td>{{ d.interface_count }}</td>
+        <td><span class="badge badge-up">{{ d.interfaces_up }}</span></td>
+        <td>{{ d.route_count }}</td>
+        <td>{{ d.updated_at|date:"Y-m-d H:i" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">No devices yet. Add one via <a href="/admin/">admin</a>.</p>
+  {% endif %}
+</main>
+
+</body>
+</html>
