@@ -90,6 +90,58 @@ class IPv4Route(models.Model):
         return f"{self.device.hostname} / {self.prefix}"
 
 
+class PollingSchedule(models.Model):
+    class TaskType(models.TextChoices):
+        INTERFACES = "interfaces", "Interfaces"
+        ROUTES = "routes", "Routes"
+        ALL = "all", "All"
+
+    device = models.ForeignKey(
+        Device,
+        on_delete=models.CASCADE,
+        related_name="polling_schedules",
+        help_text="Device to poll.",
+    )
+    task_type = models.CharField(
+        max_length=16,
+        choices=TaskType.choices,
+        default=TaskType.ALL,
+        help_text="Which data to collect on each run.",
+    )
+    interval_minutes = models.PositiveIntegerField(
+        default=5,
+        help_text="How often to poll this device, in minutes.",
+    )
+    enabled = models.BooleanField(
+        default=True,
+        help_text="Uncheck to pause polling without deleting the schedule.",
+    )
+    last_run_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Timestamp of the last successful poll.",
+    )
+    next_run_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Timestamp when the next poll is due.",
+    )
+
+    class Meta:
+        ordering = ["device", "task_type"]
+        verbose_name = "Polling Schedule"
+        verbose_name_plural = "Polling Schedules"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["device", "task_type"],
+                name="unique_device_task_type",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.device.hostname} / {self.task_type} every {self.interval_minutes}m"
+
+
 class NextHop(models.Model):
     route = models.ForeignKey(
         IPv4Route,

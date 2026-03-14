@@ -20,6 +20,7 @@ INSTALLED_APPS = [
     "django.contrib.postgres",
     "rest_framework",
     "netfields",
+    "django_q",
     "netorb",
 ]
 
@@ -93,3 +94,18 @@ USE_TZ = True
 STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Nornir device credentials (set via .env)
+NORNIR_USERNAME = config("NORNIR_USERNAME", default="admin")
+NORNIR_PASSWORD = config("NORNIR_PASSWORD", default="")
+
+# Django-Q2 cluster — uses PostgreSQL as broker, no Redis required
+Q_CLUSTER = {
+    "name": "netorb",
+    "workers": 2,
+    "timeout": 120,       # seconds before a task is killed
+    "retry": 180,         # seconds before a failed task is retried
+    "queue_limit": 50,
+    "bulk": 10,
+    "orm": "default",
+}

@@ -1,6 +1,13 @@
 from django.contrib import admin
 
-from .models import Device, Interface, IPv4Route, NextHop
+from .models import Device, Interface, IPv4Route, NextHop, PollingSchedule
+
+
+class PollingScheduleInline(admin.TabularInline):
+    model = PollingSchedule
+    extra = 0
+    fields = ("task_type", "interval_minutes", "enabled", "last_run_at", "next_run_at")
+    readonly_fields = ("last_run_at", "next_run_at")
 
 
 class InterfaceInline(admin.TabularInline):
@@ -21,7 +28,7 @@ class IPv4RouteInline(admin.TabularInline):
 class DeviceAdmin(admin.ModelAdmin):
     list_display = ("hostname", "created_at", "updated_at")
     search_fields = ("hostname",)
-    inlines = [InterfaceInline, IPv4RouteInline]
+    inlines = [PollingScheduleInline, InterfaceInline, IPv4RouteInline]
 
 
 class NextHopInline(admin.TabularInline):
@@ -49,3 +56,10 @@ class IPv4RouteAdmin(admin.ModelAdmin):
 class NextHopAdmin(admin.ModelAdmin):
     list_display = ("route", "ip_address")
     search_fields = ("ip_address", "route__prefix", "route__device__hostname")
+
+
+@admin.register(PollingSchedule)
+class PollingScheduleAdmin(admin.ModelAdmin):
+    list_display = ("device", "task_type", "interval_minutes", "enabled", "last_run_at", "next_run_at")
+    list_filter = ("enabled", "task_type", "device")
+    readonly_fields = ("last_run_at", "next_run_at")

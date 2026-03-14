@@ -5,7 +5,8 @@
 - Define models, write and apply migrations, register in admin
 
 **Milestone 3 — Business logic**
-- Service functions, any signal handlers
+- nornir tasks
+- scheduled task queue
 
 **Milestone 4 — Views & URLs**
 - Class-based views or DRF ViewSets, URL routing
