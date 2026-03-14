@@ -5,18 +5,22 @@ topology:
     sw1:
       kind: ceos
       image: ceos:4.30.7M
+      startup-config: sw1.cfg
 
     sw2:
       kind: ceos
       image: ceos:4.30.7M
+      startup-config: sw2.cfg
 
     sw3:
       kind: ceos
       image: ceos:4.30.7M
+      startup-config: sw3.cfg
 
     sw4:
       kind: ceos
       image: ceos:4.30.7M
+      startup-config: sw4.cfg
 
     node1:
       kind: linux
