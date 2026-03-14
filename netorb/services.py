@@ -18,8 +18,12 @@ from django.utils import timezone
 from nornir.core import Nornir
 from nornir.core.configuration import Config
 from nornir.core.inventory import Defaults, Groups, Host, Hosts, Inventory
+from nornir.core.plugins.connections import ConnectionPluginRegister
 from nornir.plugins.runners import SerialRunner
+from nornir_netmiko.connections.netmiko import Netmiko as NetmikoPlugin
 from nornir_netmiko.tasks import netmiko_send_command
+
+ConnectionPluginRegister.register("netmiko", NetmikoPlugin)
 
 from .log_handler import DBLogHandler
 from .models import Device, Interface, IPv4Route, NextHop, PollResult
@@ -60,7 +64,7 @@ def _collect_interfaces(task):
     """Nornir task: run 'show interfaces json' and return parsed interface dict."""
     result = task.run(
         task=netmiko_send_command,
-        command_string="show interfaces json",
+        command_string="show interfaces | json",
         read_timeout=60,
     )
     raw = json.loads(result[0].result)
@@ -74,7 +78,7 @@ def _collect_routes(task):
     """Nornir task: run 'show ip route json' and return raw VRF route dict."""
     result = task.run(
         task=netmiko_send_command,
-        command_string="show ip route json",
+        command_string="show ip route | json",
     )
     return json.loads(result[0].result)
 
