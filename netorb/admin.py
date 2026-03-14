@@ -1,6 +1,7 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 
-from .models import Device, Interface, IPv4Route, NextHop, PollResult, PollingSchedule, TaskLog
+from .models import Device, Interface, IPv4Route, NextHop, PollResult, PollingTask, TaskLog
+from .tasks import run_polling_task
 
 
 @admin.register(TaskLog)
@@ -67,8 +68,15 @@ class PollResultAdmin(admin.ModelAdmin):
     readonly_fields = ("device", "job_id", "check_type", "started_at", "duration_ms", "success")
 
 
-@admin.register(PollingSchedule)
-class PollingScheduleAdmin(admin.ModelAdmin):
-    list_display = ("task_type", "interval_minutes", "enabled", "last_run_at", "next_run_at")
-    list_filter = ("enabled", "task_type")
-    readonly_fields = ("last_run_at", "next_run_at")
+@admin.register(PollingTask)
+class PollingTaskAdmin(admin.ModelAdmin):
+    list_display = ("name", "task_type", "last_run_at", "last_success")
+    list_filter = ("task_type", "last_success")
+    readonly_fields = ("last_run_at", "last_success")
+    actions = ["run_now"]
+
+    @admin.action(description="Run selected tasks now")
+    def run_now(self, request, queryset):
+        for task in queryset:
+            run_polling_task(task)
+        self.message_user(request, f"Ran {queryset.count()} task(s).", messages.SUCCESS)

@@ -2,10 +2,10 @@
 Business logic for collecting network state from devices via Nornir.
 
 Collection flow:
-  collect_device(device)
-    └─ _make_nornir()         → single-host Nornir instance (DictInventory)
-    ├─ _collect_interfaces()  → show interfaces json → upsert Interface rows
-    └─ _collect_routes()      → show ip route json   → upsert IPv4Route + NextHop rows
+  collect_device(device, task_type)
+    └─ _make_nornir()      → single-host Nornir instance
+    ├─ task_interfaces()   → SSH → 'show interfaces | json' → parse → upsert Interface rows
+    └─ task_routes()       → SSH → 'show ip route | json'  → parse → upsert IPv4Route + NextHop rows
 """
 
 import json
@@ -60,33 +60,23 @@ def _make_nornir(device: Device) -> Nornir:
     return Nornir(inventory=inventory, runner=SerialRunner(), config=Config(logging={"enabled": False}))
 
 
-def _collect_interfaces(task):
-    """Nornir task: run 'show interfaces json' and return parsed interface dict."""
+# ---------------------------------------------------------------------------
+# Parent Nornir tasks — each handles collection + DB sync for one data type
+# ---------------------------------------------------------------------------
+
+def task_interfaces(task, device: Device) -> None:
+    """Nornir parent task: collect interface state and sync to DB."""
     result = task.run(
         task=netmiko_send_command,
         command_string="show interfaces | json",
         read_timeout=60,
     )
     raw = json.loads(result[0].result)
-    return {
-        name: {"is_up": attrs.get("lineProtocolStatus") == "connected"}
-        for name, attrs in raw.get("interfaces", {}).items()
-    }
-
-
-def _collect_routes(task):
-    """Nornir task: run 'show ip route json' and return raw VRF route dict."""
-    result = task.run(
-        task=netmiko_send_command,
-        command_string="show ip route | json",
-    )
-    return json.loads(result[0].result)
-
-
-def _sync_interfaces(device: Device, interfaces: dict) -> None:
-    for name, attrs in interfaces.items():
+    for name, attrs in raw.get("interfaces", {}).items():
         status = (
-            Interface.OperStatus.UP if attrs["is_up"] else Interface.OperStatus.DOWN
+            Interface.OperStatus.UP
+            if attrs.get("lineProtocolStatus") == "connected"
+            else Interface.OperStatus.DOWN
         )
         Interface.objects.update_or_create(
             device=device,
@@ -95,13 +85,16 @@ def _sync_interfaces(device: Device, interfaces: dict) -> None:
         )
 
 
-def _sync_routes(device: Device, route_data: dict) -> None:
+def task_routes(task, device: Device) -> None:
+    """Nornir parent task: collect IPv4 routes and sync to DB."""
+    result = task.run(
+        task=netmiko_send_command,
+        command_string="show ip route | json",
+    )
+    route_data = json.loads(result[0].result)
     routes = route_data.get("vrfs", {}).get("default", {}).get("routes", {})
     for prefix, info in routes.items():
-        route, _ = IPv4Route.objects.update_or_create(
-            device=device,
-            prefix=prefix,
-        )
+        route, _ = IPv4Route.objects.update_or_create(device=device, prefix=prefix)
         # Replace next hops on every sync to reflect current state.
         route.next_hops.all().delete()
         for via in info.get("vias", []):
@@ -111,46 +104,49 @@ def _sync_routes(device: Device, route_data: dict) -> None:
                 NextHop.objects.create(route=route, ip_address=nh)
 
 
-def _run_check(nr, task_fn, device: Device, job_id: str, check_type: str) -> bool:
-    """Run a single Nornir task, record its timing in PollResult, return success."""
+# ---------------------------------------------------------------------------
+# Task dispatch
+# ---------------------------------------------------------------------------
+
+_TASK_MAP = {
+    PollResult.CheckType.INTERFACES: task_interfaces,
+    PollResult.CheckType.ROUTES: task_routes,
+}
+
+
+def _run_check(nr: Nornir, device: Device, job_id: str, check_type: str) -> bool:
+    """Run a parent Nornir task, record its timing in PollResult, return success."""
     started_at = timezone.now()
     t0 = time.perf_counter()
-    success = True
 
-    results = nr.run(task=task_fn)
+    results = nr.run(task=_TASK_MAP[check_type], device=device)
 
-    for host, multi in results.items():
-        if multi.failed:
+    success = not results.failed
+    if success:
+        logger.info("%s collection complete for %s", check_type, device.hostname)
+    else:
+        for host, multi in results.items():
             for result in multi:
                 if result.exception:
-                    logger.error("%s collection failed for %s: %s: %s", check_type, host, type(result.exception).__name__, result.exception)
-            success = False
-        else:
-            if check_type == PollResult.CheckType.INTERFACES:
-                _sync_interfaces(device, multi[0].result)
-            else:
-                _sync_routes(device, multi[0].result)
-            logger.info("%s synced for %s", check_type.capitalize(), host)
+                    logger.error(
+                        "%s collection failed for %s: %s: %s",
+                        check_type, host, type(result.exception).__name__, result.exception,
+                    )
 
-    duration_ms = round((time.perf_counter() - t0) * 1000)
     PollResult.objects.create(
         device=device,
         job_id=job_id,
         check_type=check_type,
         started_at=started_at,
-        duration_ms=duration_ms,
+        duration_ms=round((time.perf_counter() - t0) * 1000),
         success=success,
     )
     return success
 
 
-def collect_device(device: Device, job_id: str = "") -> None:
-    """Collect interface status and routing table for *device* and persist to DB."""
+def collect_device(device: Device, job_id: str = "", task_type: str = "interfaces") -> None:
+    """Run the appropriate Nornir task for *device* and persist results to DB."""
     with _db_logging(job_id=job_id, device=device):
         nr = _make_nornir(device)
-        logger.info("Starting collection for %s", device.hostname)
-
-        _run_check(nr, _collect_interfaces, device, job_id, PollResult.CheckType.INTERFACES)
-        _run_check(nr, _collect_routes, device, job_id, PollResult.CheckType.ROUTES)
-
-        logger.info("Collection complete for %s", device.hostname)
+        logger.info("Starting %s collection for %s", task_type, device.hostname)
+        _run_check(nr, device, job_id, task_type)

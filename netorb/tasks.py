@@ -1,46 +1,36 @@
 """
-Django-Q2 task functions for scheduled device polling.
-
-Scheduling (run once after migrations):
-    from django_q.models import Schedule
-    Schedule.objects.create(
-        func="netorb.tasks.poll_all_devices",
-        schedule_type=Schedule.MINUTES,
-        minutes=5,
-        repeats=-1,  # run indefinitely
-        name="Poll all devices",
-    )
-
-Worker:
-    python manage.py qcluster
+Task functions for device polling. Can be called directly or triggered from the admin.
 """
 
 import logging
+import uuid
 
-from .models import Device
+from django.utils import timezone
+
+from .models import Device, PollingTask
 from .services import collect_device
 
 logger = logging.getLogger(__name__)
 
 
-def poll_device(device_id: int, job_id: str = "") -> None:
-    """Collect interface status and routes for a single device (by PK)."""
-    try:
-        device = Device.objects.get(pk=device_id)
-    except Device.DoesNotExist:
-        logger.error("poll_device: Device pk=%s not found", device_id)
-        return
-    collect_device(device, job_id=job_id or f"poll_device:{device_id}")
-
-
-def poll_all_devices() -> None:
-    """Collect interface status and routes for every device in the inventory."""
-    import uuid
-
+def run_polling_task(polling_task: PollingTask) -> None:
+    """Run a PollingTask against all devices and update its last_run_at / last_success."""
     devices = Device.objects.all()
     if not devices.exists():
-        logger.warning("poll_all_devices: no devices in inventory")
+        logger.warning("run_polling_task: no devices in inventory")
         return
-    job_id = f"poll_all:{uuid.uuid4().hex[:8]}"
+
+    job_id = f"poll:{polling_task.task_type}:{uuid.uuid4().hex[:8]}"
+    success = True
+
     for device in devices:
-        collect_device(device, job_id=job_id)
+        try:
+            collect_device(device, job_id=job_id, task_type=polling_task.task_type)
+        except Exception as exc:
+            logger.error("Collection failed for %s: %s", device.hostname, exc)
+            success = False
+
+    PollingTask.objects.filter(pk=polling_task.pk).update(
+        last_run_at=timezone.now(),
+        last_success=success,
+    )

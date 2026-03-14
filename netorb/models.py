@@ -133,45 +133,40 @@ class TaskLog(models.Model):
         return f"[{self.level}] {self.job_id}: {self.message[:80]}"
 
 
-class PollingSchedule(models.Model):
+class PollingTask(models.Model):
     class TaskType(models.TextChoices):
         INTERFACES = "interfaces", "Interfaces"
         ROUTES = "routes", "Routes"
-        ALL = "all", "All"
 
+    name = models.CharField(
+        max_length=100,
+        help_text="Human-readable name for this task.",
+    )
     task_type = models.CharField(
         max_length=16,
         choices=TaskType.choices,
-        default=TaskType.ALL,
+        default=TaskType.INTERFACES,
         unique=True,
-        help_text="Which data to collect on each run (applies to all devices).",
-    )
-    interval_minutes = models.PositiveIntegerField(
-        default=5,
-        help_text="How often to poll all devices, in minutes.",
-    )
-    enabled = models.BooleanField(
-        default=True,
-        help_text="Uncheck to pause polling without deleting the schedule.",
+        help_text="Which data to collect when this task runs.",
     )
     last_run_at = models.DateTimeField(
         null=True,
         blank=True,
-        help_text="Timestamp of the last successful poll.",
+        help_text="When this task last ran.",
     )
-    next_run_at = models.DateTimeField(
+    last_success = models.BooleanField(
         null=True,
         blank=True,
-        help_text="Timestamp when the next poll is due.",
+        help_text="Whether the last run completed without errors.",
     )
 
     class Meta:
         ordering = ["task_type"]
-        verbose_name = "Polling Schedule"
-        verbose_name_plural = "Polling Schedules"
+        verbose_name = "Polling Task"
+        verbose_name_plural = "Polling Tasks"
 
     def __str__(self):
-        return f"{self.task_type} every {self.interval_minutes}m"
+        return self.name
 
 
 class PollResult(models.Model):
