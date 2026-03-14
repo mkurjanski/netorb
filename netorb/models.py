@@ -8,6 +8,12 @@ class Device(models.Model):
         unique=True,
         help_text="Hostname or IP address of the monitored device.",
     )
+    description = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Optional free-text description of the device.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -133,21 +139,16 @@ class PollingSchedule(models.Model):
         ROUTES = "routes", "Routes"
         ALL = "all", "All"
 
-    device = models.ForeignKey(
-        Device,
-        on_delete=models.CASCADE,
-        related_name="polling_schedules",
-        help_text="Device to poll.",
-    )
     task_type = models.CharField(
         max_length=16,
         choices=TaskType.choices,
         default=TaskType.ALL,
-        help_text="Which data to collect on each run.",
+        unique=True,
+        help_text="Which data to collect on each run (applies to all devices).",
     )
     interval_minutes = models.PositiveIntegerField(
         default=5,
-        help_text="How often to poll this device, in minutes.",
+        help_text="How often to poll all devices, in minutes.",
     )
     enabled = models.BooleanField(
         default=True,
@@ -165,18 +166,54 @@ class PollingSchedule(models.Model):
     )
 
     class Meta:
-        ordering = ["device", "task_type"]
+        ordering = ["task_type"]
         verbose_name = "Polling Schedule"
         verbose_name_plural = "Polling Schedules"
-        constraints = [
-            models.UniqueConstraint(
-                fields=["device", "task_type"],
-                name="unique_device_task_type",
-            )
-        ]
 
     def __str__(self):
-        return f"{self.device.hostname} / {self.task_type} every {self.interval_minutes}m"
+        return f"{self.task_type} every {self.interval_minutes}m"
+
+
+class PollResult(models.Model):
+    class CheckType(models.TextChoices):
+        INTERFACES = "interfaces", "Interfaces"
+        ROUTES = "routes", "Routes"
+
+    device = models.ForeignKey(
+        Device,
+        on_delete=models.CASCADE,
+        related_name="poll_results",
+        help_text="Device that was polled.",
+    )
+    job_id = models.CharField(
+        max_length=64,
+        db_index=True,
+        help_text="Job ID of the collection run.",
+    )
+    check_type = models.CharField(
+        max_length=16,
+        choices=CheckType.choices,
+        help_text="Which data was collected in this check.",
+    )
+    started_at = models.DateTimeField(
+        help_text="When this check started.",
+    )
+    duration_ms = models.PositiveIntegerField(
+        help_text="How long the check took, in milliseconds.",
+    )
+    success = models.BooleanField(
+        default=True,
+        help_text="Whether the check completed without errors.",
+    )
+
+    class Meta:
+        ordering = ["-started_at"]
+        verbose_name = "Poll Result"
+        verbose_name_plural = "Poll Results"
+
+    def __str__(self):
+        status = "ok" if self.success else "fail"
+        return f"{self.device.hostname} / {self.check_type} / {self.duration_ms}ms [{status}]"
 
 
 class NextHop(models.Model):

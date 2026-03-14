@@ -10,7 +10,7 @@ from rest_framework.viewsets import ReadOnlyModelViewSet
 
 from django.db.models import Count, Q
 
-from .models import Device, Interface, IPv4Route, TaskLog
+from .models import Device, Interface, IPv4Route, PollResult, TaskLog
 from .serializers import InterfaceSerializer, IPv4RouteSerializer
 
 class InterfaceViewSet(ReadOnlyModelViewSet):
@@ -70,9 +70,9 @@ _SSE_POLL_INTERVAL = 1
 @login_required
 def home(request):
     devices = Device.objects.annotate(
-        interface_count=Count("interface", distinct=True),
-        interfaces_up=Count("interface", filter=Q(interface__oper_status="UP"), distinct=True),
-        route_count=Count("ipv4route", distinct=True),
+        interface_count=Count("interfaces", distinct=True),
+        interfaces_up=Count("interfaces", filter=Q(interfaces__oper_status="UP"), distinct=True),
+        route_count=Count("ipv4_routes", distinct=True),
     ).order_by("hostname")
 
     context = {
@@ -83,6 +83,24 @@ def home(request):
         "devices": devices,
     }
     return render(request, "netorb/home.html", context)
+
+
+@login_required
+def poll_results(request):
+    qs = PollResult.objects.select_related("device").order_by("-started_at")
+    selected_device = request.GET.get("device", "")
+    selected_type = request.GET.get("type", "")
+    if selected_device:
+        qs = qs.filter(device__hostname=selected_device)
+    if selected_type:
+        qs = qs.filter(check_type=selected_type)
+    devices = Device.objects.values_list("hostname", flat=True).order_by("hostname")
+    return render(request, "netorb/poll_results.html", {
+        "results": qs[:200],
+        "devices": devices,
+        "selected_device": selected_device,
+        "selected_type": selected_type,
+    })
 
 
 @login_required

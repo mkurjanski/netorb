@@ -10,14 +10,16 @@ Collection flow:
 
 import json
 import logging
+import time
 from contextlib import contextmanager
 
 from django.conf import settings
+from django.utils import timezone
 from nornir import InitNornir
 from nornir_netmiko.tasks import netmiko_send_command
 
 from .log_handler import DBLogHandler
-from .models import Device, Interface, IPv4Route, NextHop
+from .models import Device, Interface, IPv4Route, NextHop, PollResult
 
 logger = logging.getLogger(__name__)
 
@@ -109,27 +111,44 @@ def _sync_routes(device: Device, route_data: dict) -> None:
                 NextHop.objects.create(route=route, ip_address=nh)
 
 
+def _run_check(nr, task_fn, device: Device, job_id: str, check_type: str) -> bool:
+    """Run a single Nornir task, record its timing in PollResult, return success."""
+    started_at = timezone.now()
+    t0 = time.perf_counter()
+    success = True
+
+    results = nr.run(task=task_fn)
+
+    for host, multi in results.items():
+        if multi.failed:
+            logger.error("%s collection failed for %s: %s", check_type, host, multi[0].exception)
+            success = False
+        else:
+            if check_type == PollResult.CheckType.INTERFACES:
+                _sync_interfaces(device, multi[0].result)
+            else:
+                _sync_routes(device, multi[0].result)
+            logger.info("%s synced for %s", check_type.capitalize(), host)
+
+    duration_ms = round((time.perf_counter() - t0) * 1000)
+    PollResult.objects.create(
+        device=device,
+        job_id=job_id,
+        check_type=check_type,
+        started_at=started_at,
+        duration_ms=duration_ms,
+        success=success,
+    )
+    return success
+
+
 def collect_device(device: Device, job_id: str = "") -> None:
     """Collect interface status and routing table for *device* and persist to DB."""
     with _db_logging(job_id=job_id, device=device):
         nr = _make_nornir(device)
         logger.info("Starting collection for %s", device.hostname)
 
-        iface_results = nr.run(task=_collect_interfaces)
-        route_results = nr.run(task=_collect_routes)
-
-        for host, multi in iface_results.items():
-            if multi.failed:
-                logger.error("Interface collection failed for %s: %s", host, multi[0].exception)
-            else:
-                _sync_interfaces(device, multi[0].result)
-                logger.info("Interfaces synced for %s", host)
-
-        for host, multi in route_results.items():
-            if multi.failed:
-                logger.error("Route collection failed for %s: %s", host, multi[0].exception)
-            else:
-                _sync_routes(device, multi[0].result)
-                logger.info("Routes synced for %s", host)
+        _run_check(nr, _collect_interfaces, device, job_id, PollResult.CheckType.INTERFACES)
+        _run_check(nr, _collect_routes, device, job_id, PollResult.CheckType.ROUTES)
 
         logger.info("Collection complete for %s", device.hostname)

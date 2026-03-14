@@ -89,7 +89,19 @@ Schedule.objects.create(
 )
 ```
 
-`PollingSchedule` records (per device, per task type) are also stored in the database and updated by the worker after each run.
+`PollingSchedule` records (one per task type, applying to all devices) are also stored in the database.
+
+## Poll Result Tracking
+
+Every collection run records a `PollResult` entry per check type (interfaces, routes) per device, capturing:
+
+- **Device** and **check type** (interfaces / routes)
+- **Started at** — wall-clock timestamp when the check began
+- **Duration (ms)** — how long the check took end-to-end
+- **Success** — whether the check completed without errors
+- **Job ID** — links back to the `TaskLog` entries for that run
+
+Results are viewable at `/poll-results/` with filters by device and check type. Rows are colour-coded by duration (yellow ≥ 5 s, red ≥ 10 s). The last 200 results are shown per page.
 
 ## Live Log Viewer
 
