@@ -10,14 +10,30 @@ Collection flow:
 
 import json
 import logging
+from contextlib import contextmanager
 
 from django.conf import settings
 from nornir import InitNornir
 from nornir_netmiko.tasks import netmiko_send_command
 
+from .log_handler import DBLogHandler
 from .models import Device, Interface, IPv4Route, NextHop
 
 logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def _db_logging(job_id: str, device: Device):
+    """Attach a DBLogHandler for the duration of a collection run."""
+    handler = DBLogHandler(job_id=job_id, device=device)
+    handler.setFormatter(logging.Formatter("%(name)s - %(message)s"))
+    logging.getLogger("netorb").addHandler(handler)
+    logging.getLogger("nornir").addHandler(handler)
+    try:
+        yield
+    finally:
+        logging.getLogger("netorb").removeHandler(handler)
+        logging.getLogger("nornir").removeHandler(handler)
 
 
 def _make_nornir(device: Device):
@@ -93,21 +109,27 @@ def _sync_routes(device: Device, route_data: dict) -> None:
                 NextHop.objects.create(route=route, ip_address=nh)
 
 
-def collect_device(device: Device) -> None:
+def collect_device(device: Device, job_id: str = "") -> None:
     """Collect interface status and routing table for *device* and persist to DB."""
-    nr = _make_nornir(device)
+    with _db_logging(job_id=job_id, device=device):
+        nr = _make_nornir(device)
+        logger.info("Starting collection for %s", device.hostname)
 
-    iface_results = nr.run(task=_collect_interfaces)
-    route_results = nr.run(task=_collect_routes)
+        iface_results = nr.run(task=_collect_interfaces)
+        route_results = nr.run(task=_collect_routes)
 
-    for host, multi in iface_results.items():
-        if multi.failed:
-            logger.error("Interface collection failed for %s: %s", host, multi[0].exception)
-        else:
-            _sync_interfaces(device, multi[0].result)
+        for host, multi in iface_results.items():
+            if multi.failed:
+                logger.error("Interface collection failed for %s: %s", host, multi[0].exception)
+            else:
+                _sync_interfaces(device, multi[0].result)
+                logger.info("Interfaces synced for %s", host)
 
-    for host, multi in route_results.items():
-        if multi.failed:
-            logger.error("Route collection failed for %s: %s", host, multi[0].exception)
-        else:
-            _sync_routes(device, multi[0].result)
+        for host, multi in route_results.items():
+            if multi.failed:
+                logger.error("Route collection failed for %s: %s", host, multi[0].exception)
+            else:
+                _sync_routes(device, multi[0].result)
+                logger.info("Routes synced for %s", host)
+
+        logger.info("Collection complete for %s", device.hostname)

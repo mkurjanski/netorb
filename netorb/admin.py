@@ -1,6 +1,14 @@
 from django.contrib import admin
 
-from .models import Device, Interface, IPv4Route, NextHop, PollingSchedule
+from .models import Device, Interface, IPv4Route, NextHop, PollingSchedule, TaskLog
+
+
+@admin.register(TaskLog)
+class TaskLogAdmin(admin.ModelAdmin):
+    list_display = ("created_at", "job_id", "device", "level", "message")
+    list_filter = ("level", "device")
+    search_fields = ("job_id", "message", "device__hostname")
+    readonly_fields = ("job_id", "device", "level", "message", "created_at")
 
 
 class PollingScheduleInline(admin.TabularInline):

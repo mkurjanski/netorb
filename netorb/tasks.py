@@ -23,24 +23,24 @@ from .services import collect_device
 logger = logging.getLogger(__name__)
 
 
-def poll_device(device_id: int) -> None:
+def poll_device(device_id: int, job_id: str = "") -> None:
     """Collect interface status and routes for a single device (by PK)."""
     try:
         device = Device.objects.get(pk=device_id)
     except Device.DoesNotExist:
         logger.error("poll_device: Device pk=%s not found", device_id)
         return
-    logger.info("Polling device %s", device.hostname)
-    collect_device(device)
-    logger.info("Polling complete for %s", device.hostname)
+    collect_device(device, job_id=job_id or f"poll_device:{device_id}")
 
 
 def poll_all_devices() -> None:
     """Collect interface status and routes for every device in the inventory."""
+    import uuid
+
     devices = Device.objects.all()
     if not devices.exists():
         logger.warning("poll_all_devices: no devices in inventory")
         return
+    job_id = f"poll_all:{uuid.uuid4().hex[:8]}"
     for device in devices:
-        logger.info("Polling device %s", device.hostname)
-        collect_device(device)
+        collect_device(device, job_id=job_id)

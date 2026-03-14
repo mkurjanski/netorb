@@ -90,6 +90,43 @@ class IPv4Route(models.Model):
         return f"{self.device.hostname} / {self.prefix}"
 
 
+class TaskLog(models.Model):
+    class Level(models.TextChoices):
+        DEBUG = "DEBUG", "Debug"
+        INFO = "INFO", "Info"
+        WARNING = "WARNING", "Warning"
+        ERROR = "ERROR", "Error"
+
+    job_id = models.CharField(
+        max_length=64,
+        db_index=True,
+        help_text="django-q2 task ID that produced this entry.",
+    )
+    device = models.ForeignKey(
+        "Device",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="task_logs",
+        help_text="Device being polled when this entry was emitted.",
+    )
+    level = models.CharField(
+        max_length=8,
+        choices=Level.choices,
+        default=Level.INFO,
+    )
+    message = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        verbose_name = "Task Log"
+        verbose_name_plural = "Task Logs"
+
+    def __str__(self):
+        return f"[{self.level}] {self.job_id}: {self.message[:80]}"
+
+
 class PollingSchedule(models.Model):
     class TaskType(models.TextChoices):
         INTERFACES = "interfaces", "Interfaces"
