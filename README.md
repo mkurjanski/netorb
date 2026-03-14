@@ -1,4 +1,19 @@
-# Netorb
+# NetOrb
+
+## NetOrb Overview
+
+NetOrb is a simple network observability tool implemented in Django.
+
+It consists of a simple topology model that holds the hostname of the monitored devices.
+
+NetOrb runs Nornir tasks on a scheduled inverval to collect the operational data of the remote Arista EOS devices.
+
+NetOrb colects and maintaines following data sets:
+
+1. Interface table
+2. IPv4 routing table
+
+
 
 ## Getting Started
 
