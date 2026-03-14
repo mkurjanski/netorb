@@ -1,0 +1,37 @@
+name: netorb-ring
+
+topology:
+  nodes:
+    sw1:
+      kind: ceos
+      image: ceos:4.30.7M
+
+    sw2:
+      kind: ceos
+      image: ceos:4.30.7M
+
+    sw3:
+      kind: ceos
+      image: ceos:4.30.7M
+
+    sw4:
+      kind: ceos
+      image: ceos:4.30.7M
+
+    node1:
+      kind: linux
+      image: alpine:latest
+
+    node2:
+      kind: linux
+      image: alpine:latest
+
+  links:
+    # Ring: sw1 -- sw2 -- sw3 -- sw4 -- sw1
+    - endpoints: ["sw1:eth1", "sw2:eth1"]
+    - endpoints: ["sw2:eth2", "sw3:eth1"]
+    - endpoints: ["sw3:eth2", "sw4:eth1"]
+    - endpoints: ["sw4:eth2", "sw1:eth2"]
+    # End nodes on opposite sides of the ring
+    - endpoints: ["node1:eth1", "sw1:eth3"]
+    - endpoints: ["node2:eth1", "sw3:eth3"]
