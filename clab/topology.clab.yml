@@ -5,30 +5,36 @@ topology:
     sw1:
       kind: ceos
       image: ceos:4.30.7M
+      mgmt-ipv4: 172.20.20.2
       startup-config: sw1.cfg
 
     sw2:
       kind: ceos
       image: ceos:4.30.7M
+      mgmt-ipv4: 172.20.20.3
       startup-config: sw2.cfg
 
     sw3:
       kind: ceos
       image: ceos:4.30.7M
+      mgmt-ipv4: 172.20.20.4
       startup-config: sw3.cfg
 
     sw4:
       kind: ceos
       image: ceos:4.30.7M
+      mgmt-ipv4: 172.20.20.5
       startup-config: sw4.cfg
 
     node1:
       kind: linux
       image: alpine:latest
+      mgmt-ipv4: 172.20.20.6
 
     node2:
       kind: linux
       image: alpine:latest
+      mgmt-ipv4: 172.20.20.7
 
   links:
     # Ring: sw1 -- sw2 -- sw3 -- sw4 -- sw1

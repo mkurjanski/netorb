@@ -1,4 +1,5 @@
 import json
+import pathlib
 import time
 
 from django.contrib.auth.decorators import login_required
@@ -83,6 +84,23 @@ def home(request):
         "devices": devices,
     }
     return render(request, "netorb/home.html", context)
+
+
+_TASK_FILES = ["services.py", "tasks.py"]
+_APP_DIR = pathlib.Path(__file__).parent
+
+
+@login_required
+def tasks(request):
+    active_file = request.GET.get("file", _TASK_FILES[0])
+    if active_file not in _TASK_FILES:
+        active_file = _TASK_FILES[0]
+    source = (_APP_DIR / active_file).read_text()
+    return render(request, "netorb/tasks.html", {
+        "files": [{"name": f} for f in _TASK_FILES],
+        "active_file": active_file,
+        "lines": source.splitlines(),
+    })
 
 
 @login_required

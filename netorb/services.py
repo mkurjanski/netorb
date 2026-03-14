@@ -15,7 +15,10 @@ from contextlib import contextmanager
 
 from django.conf import settings
 from django.utils import timezone
-from nornir import InitNornir
+from nornir.core import Nornir
+from nornir.core.configuration import Config
+from nornir.core.inventory import Defaults, Groups, Host, Hosts, Inventory
+from nornir.plugins.runners import SerialRunner
 from nornir_netmiko.tasks import netmiko_send_command
 
 from .log_handler import DBLogHandler
@@ -38,27 +41,19 @@ def _db_logging(job_id: str, device: Device):
         logging.getLogger("nornir").removeHandler(handler)
 
 
-def _make_nornir(device: Device):
+def _make_nornir(device: Device) -> Nornir:
     """Build a single-host Nornir instance from a Device ORM object."""
-    return InitNornir(
-        runner={"plugin": "serial"},
-        logging={"enabled": False},
-        inventory={
-            "plugin": "DictInventory",
-            "options": {
-                "hosts": {
-                    device.hostname: {
-                        "hostname": device.hostname,
-                        "username": settings.NORNIR_USERNAME,
-                        "password": settings.NORNIR_PASSWORD,
-                        "platform": "arista_eos",
-                    }
-                },
-                "groups": {},
-                "defaults": {},
-            },
-        },
+    host = Host(
+        name=device.hostname,
+        hostname=device.hostname,
+        username=settings.NORNIR_USERNAME,
+        password=settings.NORNIR_PASSWORD,
+        platform="arista_eos",
+        groups=Groups(),
+        defaults=Defaults(),
     )
+    inventory = Inventory(hosts=Hosts({device.hostname: host}), groups=Groups(), defaults=Defaults())
+    return Nornir(inventory=inventory, runner=SerialRunner(), config=Config(logging={"enabled": False}))
 
 
 def _collect_interfaces(task):
@@ -66,6 +61,7 @@ def _collect_interfaces(task):
     result = task.run(
         task=netmiko_send_command,
         command_string="show interfaces json",
+        read_timeout=60,
     )
     raw = json.loads(result[0].result)
     return {
@@ -121,7 +117,9 @@ def _run_check(nr, task_fn, device: Device, job_id: str, check_type: str) -> boo
 
     for host, multi in results.items():
         if multi.failed:
-            logger.error("%s collection failed for %s: %s", check_type, host, multi[0].exception)
+            for result in multi:
+                if result.exception:
+                    logger.error("%s collection failed for %s: %s: %s", check_type, host, type(result.exception).__name__, result.exception)
             success = False
         else:
             if check_type == PollResult.CheckType.INTERFACES:
