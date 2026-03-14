@@ -5,9 +5,61 @@ from django.contrib.auth.decorators import login_required
 from django.http import StreamingHttpResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_GET
-from rest_framework.views import APIView
+from rest_framework import filters
+from rest_framework.viewsets import ReadOnlyModelViewSet
 
-from .models import TaskLog
+from .models import Interface, IPv4Route, TaskLog
+from .serializers import InterfaceSerializer, IPv4RouteSerializer
+
+class InterfaceViewSet(ReadOnlyModelViewSet):
+    """
+    list:   GET /api/interfaces/
+    retrieve: GET /api/interfaces/{id}/
+
+    Filter by device:      ?device=sw1
+    Filter by oper_status: ?oper_status=up
+    Search by name:        ?search=Ethernet
+    """
+
+    serializer_class = InterfaceSerializer
+    filter_backends = [filters.SearchFilter]
+    search_fields = ["name", "device__hostname"]
+
+    def get_queryset(self):
+        qs = Interface.objects.select_related("device").order_by("device__hostname", "name")
+        device = self.request.query_params.get("device")
+        oper_status = self.request.query_params.get("oper_status")
+        if device:
+            qs = qs.filter(device__hostname=device)
+        if oper_status:
+            qs = qs.filter(oper_status=oper_status)
+        return qs
+
+
+class IPv4RouteViewSet(ReadOnlyModelViewSet):
+    """
+    list:   GET /api/routes/
+    retrieve: GET /api/routes/{id}/
+
+    Filter by device: ?device=sw1
+    Search by prefix: ?search=10.0
+    """
+
+    serializer_class = IPv4RouteSerializer
+    filter_backends = [filters.SearchFilter]
+    search_fields = ["device__hostname"]
+
+    def get_queryset(self):
+        qs = (
+            IPv4Route.objects.select_related("device")
+            .prefetch_related("next_hops")
+            .order_by("device__hostname", "prefix")
+        )
+        device = self.request.query_params.get("device")
+        if device:
+            qs = qs.filter(device__hostname=device)
+        return qs
+
 
 _SSE_TIMEOUT_SECONDS = 120
 _SSE_POLL_INTERVAL = 1
