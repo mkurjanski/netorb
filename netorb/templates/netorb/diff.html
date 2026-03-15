@@ -90,19 +90,18 @@ th.filter-row select:focus { outline: none; border-color: #58a6ff; }
   <div class="time-form">
     <label>From (T1, UTC):</label>
     <input type="datetime-local" id="t1" name="t1" value="{{ t1 }}">
-    <button type="button" class="now-btn" onclick="document.getElementById('t1').value=''; document.getElementById('main-form').submit()">now</button>
 
     <span class="sep">→</span>
 
     <label>To (T2, UTC):</label>
     <input type="datetime-local" id="t2" name="t2" value="{{ t2 }}">
-    <button type="button" class="now-btn" onclick="document.getElementById('t2').value=''; document.getElementById('main-form').submit()">now</button>
+    <button type="button" class="now-btn" onclick="document.getElementById('t2').value=new Date().toISOString().slice(0,16)">now</button>
 
     <button type="submit">Compare</button>
 
     <span class="sep">|</span>
     <label>Device:</label>
-    <select name="device" onchange="this.form.submit()">
+    <select name="device">
       <option value="">— all —</option>
       {% for d in devices %}<option value="{{ d.ip_address }}" {% if f_device == d.ip_address %}selected{% endif %}>{{ d.display_name }}</option>{% endfor %}
     </select>
@@ -208,15 +207,4 @@ th.filter-row select:focus { outline: none; border-color: #58a6ff; }
 </table>
 {% endif %}
 </main>
-{% endblock %}
-
-{% block extra_scripts %}
-<script>
-  // Pressing Enter in the time inputs submits the form
-  ['t1','t2'].forEach(id => {
-    document.getElementById(id).addEventListener('keydown', e => {
-      if (e.key === 'Enter') document.getElementById('main-form').submit();
-    });
-  });
-</script>
 {% endblock %}
