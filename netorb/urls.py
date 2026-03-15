@@ -16,6 +16,7 @@ urlpatterns = [
     path("bgp-sessions/", views.BgpSessionListView.as_view(), name="bgp-sessions"),
     path("history/", views.history, name="history"),
     path("diff/", views.diff, name="diff"),
+    path("topology/", views.topology, name="topology"),
     path("path-tracer/", views.path_tracer, name="path-tracer"),
     path("logs/", views.log_page, name="log-page"),
     path("tasks/", views.tasks, name="tasks"),

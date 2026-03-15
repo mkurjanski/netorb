@@ -639,6 +639,53 @@ def log_stream(request):
     return response
 
 
+def topology(request):
+    """Build topology graph data from LLDP neighbors."""
+    devices = {d.ip_address: d for d in Device.objects.all()}
+    neighbors = LldpNeighbor.objects.select_related("device").exclude(
+        local_port__istartswith="Loopback"
+    ).exclude(
+        local_port__istartswith="Management"
+    )
+
+    nodes = {}
+    edges = []
+    seen_edges = set()
+
+    # Add all devices as nodes
+    for ip, device in devices.items():
+        nodes[device.hostname or ip] = {
+            "id": device.hostname or ip,
+            "label": device.display_name,
+            "ip": ip,
+        }
+
+    # Build edges from LLDP
+    for n in neighbors:
+        local_name = n.device.hostname or n.device.ip_address
+        remote_name = n.neighbor_device
+
+        # Ensure remote node exists
+        if remote_name not in nodes:
+            nodes[remote_name] = {"id": remote_name, "label": remote_name, "ip": ""}
+
+        # Deduplicate bidirectional links
+        edge_key = tuple(sorted([local_name, remote_name, n.local_port, n.neighbor_port]))
+        if edge_key not in seen_edges:
+            seen_edges.add(edge_key)
+            edges.append({
+                "source": local_name,
+                "target": remote_name,
+                "source_port": n.local_port,
+                "target_port": n.neighbor_port,
+            })
+
+    return render(request, "netorb/topology.html", {
+        "nodes_json": json.dumps(list(nodes.values())),
+        "edges_json": json.dumps(edges),
+    })
+
+
 def path_tracer(request):
     devices = Device.objects.order_by("ip_address")
     source_ip = request.GET.get("source", "")
