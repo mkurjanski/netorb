@@ -127,6 +127,83 @@ class RouteListView(LoginRequiredMixin, ListView):
         return ctx
 
 
+_LATEST_TABS = ["interfaces", "routes", "arp", "bgp_sessions"]
+
+
+@login_required
+def latest(request):
+    tab = request.GET.get("tab", "interfaces")
+    if tab not in _LATEST_TABS:
+        tab = "interfaces"
+
+    devices = Device.objects.values_list("hostname", flat=True).order_by("hostname")
+    f_device = request.GET.get("device", "")
+    ctx = {"tab": tab, "devices": devices, "f_device": f_device}
+
+    if tab == "interfaces":
+        qs = Interface.objects.select_related("device").order_by("device__hostname", "name")
+        f_name = request.GET.get("name", "")
+        f_status = request.GET.get("status", "")
+        if f_device:
+            qs = qs.filter(device__hostname=f_device)
+        if f_name:
+            qs = qs.filter(name__icontains=f_name)
+        if f_status:
+            qs = qs.filter(oper_status=f_status)
+        ctx.update({"objects": qs, "f_name": f_name, "f_status": f_status,
+                    "status_choices": Interface.OperStatus.choices})
+
+    elif tab == "routes":
+        qs = (IPv4Route.objects.select_related("device").prefetch_related("next_hops")
+              .order_by("device__hostname", "prefix"))
+        f_prefix = request.GET.get("prefix", "")
+        f_nexthop = request.GET.get("nexthop", "")
+        if f_device:
+            qs = qs.filter(device__hostname=f_device)
+        if f_prefix:
+            qs = qs.filter(prefix__startswith=f_prefix)
+        if f_nexthop:
+            qs = qs.filter(next_hops__ip_address__startswith=f_nexthop).distinct()
+        ctx.update({"objects": qs, "f_prefix": f_prefix, "f_nexthop": f_nexthop})
+
+    elif tab == "arp":
+        qs = ArpEntry.objects.select_related("device").order_by("device__hostname", "ip_address")
+        f_ip = request.GET.get("ip", "")
+        f_mac = request.GET.get("mac", "")
+        f_interface = request.GET.get("interface", "")
+        if f_device:
+            qs = qs.filter(device__hostname=f_device)
+        if f_ip:
+            qs = qs.filter(ip_address__startswith=f_ip)
+        if f_mac:
+            qs = qs.filter(mac_address__icontains=f_mac)
+        if f_interface:
+            qs = qs.filter(interface__icontains=f_interface)
+        ctx.update({"objects": qs, "f_ip": f_ip, "f_mac": f_mac, "f_interface": f_interface})
+
+    elif tab == "bgp_sessions":
+        qs = BgpSession.objects.select_related("device").order_by("device__hostname", "vrf", "peer_ip")
+        f_vrf = request.GET.get("vrf", "")
+        f_peer_ip = request.GET.get("peer_ip", "")
+        f_peer_asn = request.GET.get("peer_asn", "")
+        f_state = request.GET.get("state", "")
+        if f_device:
+            qs = qs.filter(device__hostname=f_device)
+        if f_vrf:
+            qs = qs.filter(vrf__icontains=f_vrf)
+        if f_peer_ip:
+            qs = qs.filter(peer_ip__startswith=f_peer_ip)
+        if f_peer_asn:
+            qs = qs.filter(peer_asn=f_peer_asn)
+        if f_state:
+            qs = qs.filter(peer_state=f_state)
+        ctx.update({"objects": qs, "f_vrf": f_vrf, "f_peer_ip": f_peer_ip,
+                    "f_peer_asn": f_peer_asn, "f_state": f_state,
+                    "state_choices": BgpSession.PeerState.choices})
+
+    return render(request, "netorb/latest.html", ctx)
+
+
 class ArpEntryListView(LoginRequiredMixin, ListView):
     model = ArpEntry
     template_name = "netorb/arp.html"

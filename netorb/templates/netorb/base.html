@@ -15,7 +15,7 @@
     header h1 { font-size: 1rem; font-weight: 600; }
 
     nav {
-      display: flex; gap: .5rem;
+      display: flex; gap: .5rem; align-items: center;
       padding: .5rem 1.25rem; background: #161b22; border-bottom: 1px solid #30363d;
     }
     nav a {
@@ -36,17 +36,16 @@
   <h1>netorb</h1>
 </header>
 
+{% with url_name=request.resolver_match.url_name %}
 <nav>
-  <a href="/" {% if request.resolver_match.url_name == 'home' %}class="active"{% endif %}>Home</a>
-  <a href="/interfaces/" {% if request.resolver_match.url_name == 'interfaces' %}class="active"{% endif %}>Interfaces</a>
-  <a href="/routes/" {% if request.resolver_match.url_name == 'routes' %}class="active"{% endif %}>Routes</a>
-  <a href="/arp/" {% if request.resolver_match.url_name == 'arp' %}class="active"{% endif %}>ARP</a>
-  <a href="/bgp-sessions/" {% if request.resolver_match.url_name == 'bgp-sessions' %}class="active"{% endif %}>BGP Sessions</a>
-  <a href="/logs/" {% if request.resolver_match.url_name == 'log-page' %}class="active"{% endif %}>Logs</a>
-  <a href="/poll-results/" {% if request.resolver_match.url_name == 'poll-results' %}class="active"{% endif %}>Poll Results</a>
-  <a href="/tasks/" {% if request.resolver_match.url_name == 'tasks' %}class="active"{% endif %}>Tasks</a>
+  <a href="/" {% if url_name == 'home' %}class="active"{% endif %}>Home</a>
+  <a href="/latest/" {% if url_name == 'latest' %}class="active"{% endif %}>Latest</a>
+  <a href="/logs/" {% if url_name == 'log-page' %}class="active"{% endif %}>Logs</a>
+  <a href="/poll-results/" {% if url_name == 'poll-results' %}class="active"{% endif %}>Poll Results</a>
+  <a href="/tasks/" {% if url_name == 'tasks' %}class="active"{% endif %}>Tasks</a>
   <a href="/admin/">Admin</a>
 </nav>
+{% endwith %}
 
 {% block content %}{% endblock %}
 

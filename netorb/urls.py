@@ -9,6 +9,7 @@ router.register("routes", views.IPv4RouteViewSet, basename="route")
 
 urlpatterns = [
     path("", views.home, name="home"),
+    path("latest/", views.latest, name="latest"),
     path("interfaces/", views.InterfaceListView.as_view(), name="interfaces"),
     path("routes/", views.RouteListView.as_view(), name="routes"),
     path("arp/", views.ArpEntryListView.as_view(), name="arp"),
