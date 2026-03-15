@@ -13,7 +13,7 @@ from rest_framework.viewsets import ReadOnlyModelViewSet
 from django.apps import apps
 from django.db.models import Count, Func, Q, TextField
 
-from .models import ArpEntry, BgpSession, Device, Interface, IPv4Route, PollResult, TaskLog
+from .models import ArpEntry, BgpSession, Device, Interface, IPv4Route, LldpNeighbor, PollResult, TaskLog
 from .serializers import InterfaceSerializer, IPv4RouteSerializer
 from .services import trace_path
 
@@ -193,7 +193,7 @@ class RouteListView(ListView):
         return ctx
 
 
-_LATEST_TABS = ["interfaces", "routes", "arp", "bgp_sessions"]
+_LATEST_TABS = ["interfaces", "routes", "arp", "bgp_sessions", "lldp"]
 
 
 def latest(request):
@@ -264,6 +264,18 @@ def latest(request):
         ctx.update({"objects": qs, "f_vrf": f_vrf, "f_peer_ip": f_peer_ip,
                     "f_peer_asn": f_peer_asn, "f_state": f_state,
                     "state_choices": BgpSession.PeerState.choices})
+
+    elif tab == "lldp":
+        qs = LldpNeighbor.objects.select_related("device").order_by("device__ip_address", "local_port")
+        f_local_port = request.GET.get("local_port", "")
+        f_neighbor = request.GET.get("neighbor", "")
+        if f_device:
+            qs = qs.filter(device__ip_address=f_device)
+        if f_local_port:
+            qs = qs.filter(local_port__icontains=f_local_port)
+        if f_neighbor:
+            qs = qs.filter(neighbor_device__icontains=f_neighbor)
+        ctx.update({"objects": qs, "f_local_port": f_local_port, "f_neighbor": f_neighbor})
 
     return render(request, "netorb/latest.html", ctx)
 
@@ -337,7 +349,7 @@ class BgpSessionListView(ListView):
         return ctx
 
 
-_HISTORY_TABS = ["interfaces", "routes", "arp", "bgp_sessions"]
+_HISTORY_TABS = ["interfaces", "routes", "arp", "bgp_sessions", "lldp"]
 _EVENT_LABELS = [("insert", "Insert"), ("update", "Update"), ("delete", "Delete")]
 
 
@@ -424,6 +436,21 @@ def history(request):
             "state_choices": BgpSession.PeerState.choices,
         })
 
+    elif tab == "lldp":
+        LldpNeighborEvent = apps.get_model("netorb", "LldpNeighborEvent")
+        qs = LldpNeighborEvent.objects.select_related("device").order_by("-pgh_created_at")
+        f_local_port = request.GET.get("local_port", "")
+        f_neighbor = request.GET.get("neighbor", "")
+        if f_device:
+            qs = qs.filter(device__ip_address=f_device)
+        if f_event:
+            qs = qs.filter(pgh_label=f_event)
+        if f_local_port:
+            qs = qs.filter(local_port__icontains=f_local_port)
+        if f_neighbor:
+            qs = qs.filter(neighbor_device__icontains=f_neighbor)
+        ctx.update({"objects": qs[:500], "f_local_port": f_local_port, "f_neighbor": f_neighbor})
+
     return render(request, "netorb/history.html", ctx)
 
 
@@ -498,6 +525,18 @@ def diff(request):
         ctx["diff_rows"] = _sort_diff(rows, "vrf", "peer_ip")
         ctx["state_choices"] = BgpSession.PeerState.choices
 
+    elif tab == "lldp":
+        LldpNeighborEvent = apps.get_model("netorb", "LldpNeighborEvent")
+        s1 = _snapshot_at(LldpNeighborEvent, t1)
+        s2 = _snapshot_at(LldpNeighborEvent, t2)
+        rows = _build_diff(s1, s2, lambda a, b: (
+            a.neighbor_device != b.neighbor_device
+            or a.neighbor_port != b.neighbor_port
+        ))
+        if f_device:
+            rows = _filter_diff_by_device(rows, f_device)
+        ctx["diff_rows"] = _sort_diff(rows, "local_port")
+
     return render(request, "netorb/diff.html", ctx)
 
 
@@ -538,18 +577,12 @@ def tasks(request):
 
 
 def poll_results(request):
-    qs = PollResult.objects.select_related("device").order_by("-started_at")
-    selected_device = request.GET.get("device", "")
+    qs = PollResult.objects.order_by("-started_at")
     selected_type = request.GET.get("type", "")
-    if selected_device:
-        qs = qs.filter(device__ip_address=selected_device)
     if selected_type:
         qs = qs.filter(check_type=selected_type)
-    devices = Device.objects.order_by("ip_address")
     return render(request, "netorb/poll_results.html", {
         "results": qs[:200],
-        "devices": devices,
-        "selected_device": selected_device,
         "selected_type": selected_type,
     })
 

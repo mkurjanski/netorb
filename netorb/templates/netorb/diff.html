@@ -118,6 +118,7 @@ th.filter-row select:focus { outline: none; border-color: #58a6ff; }
   <a href="?tab=routes&t1={{ t1 }}&t2={{ t2 }}&device={{ f_device }}"      {% if tab == 'routes'      %}class="active"{% endif %}>Routes</a>
   <a href="?tab=arp&t1={{ t1 }}&t2={{ t2 }}&device={{ f_device }}"         {% if tab == 'arp'         %}class="active"{% endif %}>ARP</a>
   <a href="?tab=bgp_sessions&t1={{ t1 }}&t2={{ t2 }}&device={{ f_device }}"{% if tab == 'bgp_sessions'%}class="active"{% endif %}>BGP Sessions</a>
+  <a href="?tab=lldp&t1={{ t1 }}&t2={{ t2 }}&device={{ f_device }}"         {% if tab == 'lldp'         %}class="active"{% endif %}>LLDP</a>
 </div>
 
 <main>
@@ -203,6 +204,23 @@ th.filter-row select:focus { outline: none; border-color: #58a6ff; }
       <td>{% if row.t2 %}{{ row.t2.prefixes_received }}{% else %}<span class="dash">—</span>{% endif %}</td>
     </tr>
     {% empty %}<tr><td colspan="9"><span class="empty">No BGP session changes between these timestamps.</span></td></tr>{% endfor %}
+  </tbody>
+</table>
+{% elif tab == 'lldp' %}
+<table>
+  <thead>
+    <tr><th>Status</th><th>Device</th><th>Local Port</th><th>T1 Neighbor</th><th>T2 Neighbor</th></tr>
+  </thead>
+  <tbody>
+    {% for row in diff_rows %}
+    <tr>
+      <td><span class="badge badge-{{ row.status }}">{{ row.status }}</span></td>
+      <td>{% if row.t2 %}{{ row.t2.device.display_name }}{% else %}{{ row.t1.device.display_name }}{% endif %}</td>
+      <td>{% if row.t2 %}{{ row.t2.local_port }}{% else %}{{ row.t1.local_port }}{% endif %}</td>
+      <td>{% if row.t1 %}{{ row.t1.neighbor_device }} / {{ row.t1.neighbor_port }}{% else %}<span class="dash">—</span>{% endif %}</td>
+      <td>{% if row.t2 %}{{ row.t2.neighbor_device }} / {{ row.t2.neighbor_port }}{% else %}<span class="dash">—</span>{% endif %}</td>
+    </tr>
+    {% empty %}<tr><td colspan="5"><span class="empty">No LLDP changes between these timestamps.</span></td></tr>{% endfor %}
   </tbody>
 </table>
 {% endif %}

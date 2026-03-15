@@ -27,8 +27,11 @@ tr:hover td { background: #161b22; }
   display: inline-block; padding: .1rem .45rem;
   border-radius: 3px; font-size: .75rem; font-weight: 600;
 }
-.badge-interfaces { background: #0d2d4d; color: #58a6ff; }
-.badge-routes     { background: #2d1f4d; color: #d2a8ff; }
+.badge-interfaces   { background: #0d2d4d; color: #58a6ff; }
+.badge-routes       { background: #2d1f4d; color: #d2a8ff; }
+.badge-bgp_sessions { background: #0d3a1e; color: #3fb950; }
+.badge-arp          { background: #4d3800; color: #e3b341; }
+.badge-lldp         { background: #21262d; color: #c9d1d9; }
 .badge-ok         { background: #0d3a1e; color: #3fb950; }
 .badge-fail       { background: #2d1a1a; color: #f85149; }
 
@@ -41,19 +44,14 @@ tr:hover td { background: #161b22; }
 
 {% block content %}
 <div class="controls">
-  <label for="device-filter">Device:</label>
-  <select id="device-filter" onchange="applyFilter()">
-    <option value="">— all —</option>
-    {% for d in devices %}
-      <option value="{{ d.ip_address }}" {% if selected_device == d.ip_address %}selected{% endif %}>{{ d.display_name }}</option>
-    {% endfor %}
-  </select>
-
   <label for="type-filter">Check:</label>
   <select id="type-filter" onchange="applyFilter()">
     <option value="">— all —</option>
     <option value="interfaces" {% if selected_type == "interfaces" %}selected{% endif %}>Interfaces</option>
     <option value="routes" {% if selected_type == "routes" %}selected{% endif %}>Routes</option>
+    <option value="bgp_sessions" {% if selected_type == "bgp_sessions" %}selected{% endif %}>BGP Sessions</option>
+    <option value="arp" {% if selected_type == "arp" %}selected{% endif %}>ARP</option>
+    <option value="lldp" {% if selected_type == "lldp" %}selected{% endif %}>LLDP</option>
   </select>
 </div>
 
@@ -63,7 +61,6 @@ tr:hover td { background: #161b22; }
     <thead>
       <tr>
         <th>Started</th>
-        <th>Device</th>
         <th>Check</th>
         <th>Duration</th>
         <th>Status</th>
@@ -74,7 +71,6 @@ tr:hover td { background: #161b22; }
       {% for r in results %}
       <tr>
         <td>{{ r.started_at|date:"Y-m-d H:i:s" }}</td>
-        <td>{{ r.device.display_name }}</td>
         <td><span class="badge badge-{{ r.check_type }}">{{ r.get_check_type_display }}</span></td>
         <td>
           <span class="duration {% if r.duration_ms >= 10000 %}very-slow{% elif r.duration_ms >= 5000 %}slow{% endif %}">
@@ -102,11 +98,9 @@ tr:hover td { background: #161b22; }
 {% block extra_scripts %}
 <script>
   function applyFilter() {
-    const device = document.getElementById('device-filter').value;
-    const type   = document.getElementById('type-filter').value;
+    const type = document.getElementById('type-filter').value;
     const params = new URLSearchParams();
-    if (device) params.set('device', device);
-    if (type)   params.set('type', type);
+    if (type) params.set('type', type);
     window.location.search = params.toString();
   }
 </script>

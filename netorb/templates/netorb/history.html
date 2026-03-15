@@ -59,6 +59,7 @@ th.filter-row input:focus, th.filter-row select:focus { outline: none; border-co
   <a href="?tab=routes"      {% if tab == 'routes'      %}class="active"{% endif %}>Routes</a>
   <a href="?tab=arp"         {% if tab == 'arp'         %}class="active"{% endif %}>ARP</a>
   <a href="?tab=bgp_sessions"{% if tab == 'bgp_sessions'%}class="active"{% endif %}>BGP Sessions</a>
+  <a href="?tab=lldp"         {% if tab == 'lldp'         %}class="active"{% endif %}>LLDP</a>
 </div>
 
 <form method="get" id="filter-form">
@@ -212,6 +213,40 @@ th.filter-row input:focus, th.filter-row select:focus { outline: none; border-co
         <td>{{ e.prefixes_accepted }}</td>
       </tr>
       {% empty %}<tr><td colspan="9" class="empty" style="padding:.75rem">No BGP session events found.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+  </main>
+
+  {% elif tab == 'lldp' %}
+  <main>
+  <table>
+    <thead>
+      <tr><th>Time</th><th>Event</th><th>Device</th><th>Local Port</th><th>Neighbor Device</th><th>Neighbor Port</th></tr>
+      <tr>
+        <th class="filter-row"></th>
+        <th class="filter-row">
+          <select name="event" onchange="this.form.submit()">
+            <option value="">— all —</option>
+            {% for v, l in event_labels %}<option value="{{ v }}" {% if f_event == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+          </select>
+        </th>
+        <th class="filter-row"><select name="device" onchange="this.form.submit()"><option value="">— all —</option>{% for d in devices %}<option value="{{ d.ip_address }}" {% if f_device == d.ip_address %}selected{% endif %}>{{ d.display_name }}</option>{% endfor %}</select></th>
+        <th class="filter-row"><input type="text" name="local_port" value="{{ f_local_port }}" placeholder="filter…"></th>
+        <th class="filter-row"><input type="text" name="neighbor" value="{{ f_neighbor }}" placeholder="filter…"></th>
+        <th class="filter-row"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in objects %}
+      <tr>
+        <td style="color:#484f58;white-space:nowrap">{{ e.pgh_created_at|date:"Y-m-d H:i:s" }}</td>
+        <td><span class="badge badge-{{ e.pgh_label }}">{{ e.pgh_label }}</span></td>
+        <td>{{ e.device.display_name }}</td>
+        <td>{{ e.local_port }}</td>
+        <td>{{ e.neighbor_device }}</td>
+        <td>{{ e.neighbor_port }}</td>
+      </tr>
+      {% empty %}<tr><td colspan="6" class="empty" style="padding:.75rem">No LLDP events found.</td></tr>{% endfor %}
     </tbody>
   </table>
   </main>

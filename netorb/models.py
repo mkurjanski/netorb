@@ -174,6 +174,7 @@ class PollingTask(models.Model):
         ROUTES = "routes", "Routes"
         BGP_SESSIONS = "bgp_sessions", "BGP Sessions"
         ARP = "arp", "ARP"
+        LLDP = "lldp", "LLDP"
 
     name = models.CharField(
         max_length=100,
@@ -327,19 +328,59 @@ class ArpEntry(models.Model):
         return f"{self.device.hostname} / {self.ip_address} / {self.mac_address}"
 
 
+@pghistory.track(
+    pghistory.InsertEvent(),
+    pghistory.UpdateEvent(),
+    pghistory.DeleteEvent(),
+    exclude=["collected_at"],
+)
+class LldpNeighbor(models.Model):
+    device = models.ForeignKey(
+        Device,
+        on_delete=models.CASCADE,
+        related_name="lldp_neighbors",
+        help_text="Device this LLDP neighbor was collected from.",
+    )
+    local_port = models.CharField(
+        max_length=255,
+        help_text="Local interface name (e.g. Ethernet1).",
+    )
+    neighbor_device = models.CharField(
+        max_length=255,
+        help_text="Remote device name reported by LLDP.",
+    )
+    neighbor_port = models.CharField(
+        max_length=255,
+        help_text="Remote port name reported by LLDP.",
+    )
+    collected_at = models.DateTimeField(
+        auto_now=True,
+        help_text="Timestamp of the last data collection.",
+    )
+
+    class Meta:
+        ordering = ["device", "local_port"]
+        verbose_name = "LLDP Neighbor"
+        verbose_name_plural = "LLDP Neighbors"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["device", "local_port", "neighbor_device", "neighbor_port"],
+                name="unique_device_lldp_neighbor",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.device} / {self.local_port} → {self.neighbor_device} / {self.neighbor_port}"
+
+
 class PollResult(models.Model):
     class CheckType(models.TextChoices):
         INTERFACES = "interfaces", "Interfaces"
         ROUTES = "routes", "Routes"
         BGP_SESSIONS = "bgp_sessions", "BGP Sessions"
         ARP = "arp", "ARP"
+        LLDP = "lldp", "LLDP"
 
-    device = models.ForeignKey(
-        Device,
-        on_delete=models.CASCADE,
-        related_name="poll_results",
-        help_text="Device that was polled.",
-    )
     job_id = models.CharField(
         max_length=64,
         db_index=True,
@@ -368,6 +409,6 @@ class PollResult(models.Model):
 
     def __str__(self):
         status = "ok" if self.success else "fail"
-        return f"{self.device.hostname} / {self.check_type} / {self.duration_ms}ms [{status}]"
+        return f"{self.check_type} / {self.duration_ms}ms [{status}]"
 
 

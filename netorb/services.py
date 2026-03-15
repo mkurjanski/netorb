@@ -2,12 +2,14 @@
 Business logic for collecting network state from devices via Nornir.
 
 Collection flow:
-  collect_device(device, task_type)
-    └─ _make_nornir()        → single-host Nornir instance
-    ├─ task_interfaces()     → SSH → 'show interfaces | json'    → parse → upsert Interface rows
-    ├─ task_routes()         → SSH → 'show ip route | json'      → parse → upsert IPv4Route rows
-    ├─ task_bgp_sessions()   → SSH → 'show ip bgp summary | json'→ parse → upsert BgpSession rows
-    └─ task_arp()            → SSH → 'show ip arp | json'        → parse → upsert ArpEntry rows
+  collect_all(task_type, job_id)
+    └─ _make_nornir(devices)  → multi-host Nornir (ThreadedRunner, concurrent)
+    └─ nr.run(task_fn)        → runs on all hosts in parallel
+       ├─ task_interfaces()   → SSH → 'show interfaces | json'    → parse → upsert Interface rows
+       ├─ task_routes()       → SSH → 'show ip route | json'      → parse → upsert IPv4Route rows
+       ├─ task_bgp_sessions() → SSH → 'show ip bgp summary | json'→ parse → upsert BgpSession rows
+       └─ task_arp()          → SSH → 'show ip arp | json'        → parse → upsert ArpEntry rows
+    └─ PollResult.objects.create(...)  → one batch-level row
 """
 
 import ipaddress
@@ -24,53 +26,68 @@ from nornir.core import Nornir
 from nornir.core.configuration import Config
 from nornir.core.inventory import Defaults, Groups, Host, Hosts, Inventory
 from nornir.core.plugins.connections import ConnectionPluginRegister
-from nornir.plugins.runners import SerialRunner
+from nornir.plugins.runners import ThreadedRunner
 from nornir_netmiko.connections.netmiko import Netmiko as NetmikoPlugin
 from nornir_netmiko.tasks import netmiko_send_command
 
 ConnectionPluginRegister.register("netmiko", NetmikoPlugin)
 
 from .log_handler import DBLogHandler
-from .models import ArpEntry, BgpSession, Device, Interface, IPv4Route, PollResult
+from .models import ArpEntry, BgpSession, Device, Interface, IPv4Route, LldpNeighbor, PollResult
 
 logger = logging.getLogger(__name__)
 
 
 @contextmanager
-def _db_logging(job_id: str, device: Device):
+def _db_logging(job_id: str):
     """Attach a DBLogHandler for the duration of a collection run."""
-    handler = DBLogHandler(job_id=job_id, device=device)
+    handler = DBLogHandler(job_id=job_id)
     handler.setFormatter(logging.Formatter("%(name)s - %(message)s"))
-    logging.getLogger("netorb").addHandler(handler)
-    logging.getLogger("nornir").addHandler(handler)
+
+    loggers = [logging.getLogger("netorb"), logging.getLogger("nornir")]
+    saved_levels = []
+    for lg in loggers:
+        saved_levels.append(lg.level)
+        if lg.level == logging.NOTSET or lg.level > logging.INFO:
+            lg.setLevel(logging.INFO)
+        lg.addHandler(handler)
     try:
         yield
     finally:
-        logging.getLogger("netorb").removeHandler(handler)
-        logging.getLogger("nornir").removeHandler(handler)
+        for lg, saved in zip(loggers, saved_levels):
+            lg.removeHandler(handler)
+            lg.setLevel(saved)
 
 
-def _make_nornir(device: Device) -> Nornir:
-    """Build a single-host Nornir instance from a Device ORM object."""
-    host = Host(
-        name=device.ip_address,
-        hostname=device.ip_address,
-        username=settings.NORNIR_USERNAME,
-        password=settings.NORNIR_PASSWORD,
-        platform="arista_eos",
-        groups=Groups(),
-        defaults=Defaults(),
-    )
-    inventory = Inventory(hosts=Hosts({device.ip_address: host}), groups=Groups(), defaults=Defaults())
-    return Nornir(inventory=inventory, runner=SerialRunner(), config=Config(logging={"enabled": False}))
+def _make_nornir(devices) -> Nornir:
+    """Build a multi-host Nornir instance from Device queryset.
+
+    Each host stores its Device ORM object in host.data["device"] so that
+    task functions can access it.
+    """
+    hosts = Hosts()
+    for device in devices:
+        hosts[device.ip_address] = Host(
+            name=device.ip_address,
+            hostname=device.ip_address,
+            username=settings.NORNIR_USERNAME,
+            password=settings.NORNIR_PASSWORD,
+            platform="arista_eos",
+            data={"device": device},
+            groups=Groups(),
+            defaults=Defaults(),
+        )
+    inventory = Inventory(hosts=hosts, groups=Groups(), defaults=Defaults())
+    return Nornir(inventory=inventory, runner=ThreadedRunner(), config=Config(logging={"enabled": False}))
 
 
 # ---------------------------------------------------------------------------
-# Parent Nornir tasks — each handles collection + DB sync for one data type
+# Nornir tasks — each handles collection + DB sync for one data type.
+# The Device ORM object is retrieved from task.host.data["device"].
 # ---------------------------------------------------------------------------
 
-def task_interfaces(task, device: Device) -> None:
-    """Nornir parent task: collect interface state and sync to DB."""
+def task_interfaces(task) -> None:
+    device = task.host.data["device"]
     result = task.run(
         task=netmiko_send_command,
         command_string="show interfaces | json",
@@ -97,8 +114,8 @@ def task_interfaces(task, device: Device) -> None:
         )
 
 
-def task_routes(task, device: Device) -> None:
-    """Nornir parent task: collect IPv4 routes and sync to DB."""
+def task_routes(task) -> None:
+    device = task.host.data["device"]
     result = task.run(
         task=netmiko_send_command,
         command_string="show ip route | json",
@@ -109,7 +126,6 @@ def task_routes(task, device: Device) -> None:
         next_hops = []
         for via in info.get("vias", []):
             nh_addr = via.get("nexthopAddr")
-            # EOS uses the string "None" for directly connected routes.
             if nh_addr in (None, "None"):
                 continue
             next_hops.append({
@@ -123,8 +139,8 @@ def task_routes(task, device: Device) -> None:
         )
 
 
-def task_bgp_sessions(task, device: Device) -> None:
-    """Nornir parent task: collect BGP session state and sync to DB."""
+def task_bgp_sessions(task) -> None:
+    device = task.host.data["device"]
     result = task.run(
         task=netmiko_send_command,
         command_string="show ip bgp summary | json",
@@ -147,8 +163,8 @@ def task_bgp_sessions(task, device: Device) -> None:
             )
 
 
-def task_arp(task, device: Device) -> None:
-    """Nornir parent task: collect ARP table and sync to DB."""
+def task_arp(task) -> None:
+    device = task.host.data["device"]
     result = task.run(
         task=netmiko_send_command,
         command_string="show ip arp | json",
@@ -156,7 +172,6 @@ def task_arp(task, device: Device) -> None:
     data = json.loads(result[0].result)
     neighbors = data.get("ipV4Neighbors", [])
 
-    # Full replace — remove stale entries then upsert current ones.
     current_ips = {entry["address"] for entry in neighbors}
     ArpEntry.objects.filter(device=device).exclude(ip_address__in=current_ips).delete()
 
@@ -172,8 +187,35 @@ def task_arp(task, device: Device) -> None:
         )
 
 
+def task_lldp(task) -> None:
+    device = task.host.data["device"]
+    result = task.run(
+        task=netmiko_send_command,
+        command_string="show lldp neighbors | json",
+    )
+    data = json.loads(result[0].result)
+    neighbors = data.get("lldpNeighbors", [])
+
+    # Full replace — remove stale entries then upsert current ones.
+    current_keys = {
+        (n["port"], n["neighborDevice"], n["neighborPort"]) for n in neighbors
+    }
+    for existing in LldpNeighbor.objects.filter(device=device):
+        key = (existing.local_port, existing.neighbor_device, existing.neighbor_port)
+        if key not in current_keys:
+            existing.delete()
+
+    for n in neighbors:
+        LldpNeighbor.objects.update_or_create(
+            device=device,
+            local_port=n["port"],
+            neighbor_device=n["neighborDevice"],
+            neighbor_port=n["neighborPort"],
+        )
+
+
 # ---------------------------------------------------------------------------
-# Task dispatch
+# Collection entry point
 # ---------------------------------------------------------------------------
 
 _TASK_MAP = {
@@ -181,45 +223,61 @@ _TASK_MAP = {
     PollResult.CheckType.ROUTES: task_routes,
     PollResult.CheckType.BGP_SESSIONS: task_bgp_sessions,
     PollResult.CheckType.ARP: task_arp,
+    PollResult.CheckType.LLDP: task_lldp,
 }
 
 
-def _run_check(nr: Nornir, device: Device, job_id: str, check_type: str) -> bool:
-    """Run a parent Nornir task, record its timing in PollResult, return success."""
-    started_at = timezone.now()
-    t0 = time.perf_counter()
+def collect_all(task_type: str, job_id: str = "") -> bool:
+    """Run a Nornir task concurrently against all devices in inventory.
 
-    results = nr.run(task=_TASK_MAP[check_type], device=device)
+    Creates a single batch-level PollResult row.
+    Returns True if all devices succeeded.
+    """
+    devices = list(Device.objects.all())
+    if not devices:
+        logger.warning("collect_all: no devices in inventory")
+        return True
 
-    success = not results.failed
-    if success:
-        logger.info("%s collection complete for %s", check_type, device.display_name)
-    else:
-        for host, multi in results.items():
-            for result in multi:
-                if result.exception:
-                    logger.error(
-                        "%s collection failed for %s: %s: %s",
-                        check_type, host, type(result.exception).__name__, result.exception,
-                    )
+    with _db_logging(job_id=job_id):
+        nr = _make_nornir(devices)
+        logger.info("Starting %s collection for %d devices", task_type, len(devices))
 
-    PollResult.objects.create(
-        device=device,
-        job_id=job_id,
-        check_type=check_type,
-        started_at=started_at,
-        duration_ms=round((time.perf_counter() - t0) * 1000),
-        success=success,
-    )
-    return success
+        started_at = timezone.now()
+        t0 = time.perf_counter()
 
+        results = nr.run(task=_TASK_MAP[task_type])
 
-def collect_device(device: Device, job_id: str = "", task_type: str = "interfaces") -> None:
-    """Run the appropriate Nornir task for *device* and persist results to DB."""
-    with _db_logging(job_id=job_id, device=device):
-        nr = _make_nornir(device)
-        logger.info("Starting %s collection for %s", task_type, device.display_name)
-        _run_check(nr, device, job_id, task_type)
+        duration_ms = round((time.perf_counter() - t0) * 1000)
+        all_ok = not results.failed
+
+        for host_ip, multi in results.items():
+            device = nr.inventory.hosts[host_ip].data["device"]
+            if multi.failed:
+                for result in multi:
+                    if result.exception:
+                        logger.error(
+                            "%s failed for %s: %s: %s",
+                            task_type, device.display_name,
+                            type(result.exception).__name__, result.exception,
+                        )
+            else:
+                logger.info("%s complete for %s", task_type, device.display_name)
+
+        PollResult.objects.create(
+            job_id=job_id,
+            check_type=task_type,
+            started_at=started_at,
+            duration_ms=duration_ms,
+            success=all_ok,
+        )
+
+        logger.info(
+            "%s collection finished in %d ms — %d/%d ok",
+            task_type, duration_ms,
+            sum(1 for m in results.values() if not m.failed), len(devices),
+        )
+
+    return all_ok
 
 
 # ---------------------------------------------------------------------------

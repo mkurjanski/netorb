@@ -55,6 +55,7 @@ th.filter-row input:focus, th.filter-row select:focus { outline: none; border-co
   <a href="?tab=routes"     {% if tab == 'routes'     %}class="active"{% endif %}>Routes</a>
   <a href="?tab=arp"        {% if tab == 'arp'        %}class="active"{% endif %}>ARP</a>
   <a href="?tab=bgp_sessions" {% if tab == 'bgp_sessions' %}class="active"{% endif %}>BGP Sessions</a>
+  <a href="?tab=lldp"         {% if tab == 'lldp'         %}class="active"{% endif %}>LLDP</a>
 </div>
 
 <form method="get" id="filter-form">
@@ -182,6 +183,33 @@ th.filter-row input:focus, th.filter-row select:focus { outline: none; border-co
         <td style="color:#484f58">{{ s.collected_at|date:"Y-m-d H:i:s" }}</td>
       </tr>
       {% empty %}<tr><td colspan="9" class="empty" style="padding:.75rem">No BGP sessions found.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+  </main>
+
+  {% elif tab == 'lldp' %}
+  <main>
+  <table>
+    <thead>
+      <tr><th>Device</th><th>Local Port</th><th>Neighbor Device</th><th>Neighbor Port</th><th>Collected</th></tr>
+      <tr>
+        <th class="filter-row"><select name="device" onchange="this.form.submit()"><option value="">— all —</option>{% for d in devices %}<option value="{{ d.ip_address }}" {% if f_device == d.ip_address %}selected{% endif %}>{{ d.display_name }}</option>{% endfor %}</select></th>
+        <th class="filter-row"><input type="text" name="local_port" value="{{ f_local_port }}" placeholder="filter…"></th>
+        <th class="filter-row"><input type="text" name="neighbor" value="{{ f_neighbor }}" placeholder="filter…"></th>
+        <th class="filter-row"></th>
+        <th class="filter-row"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for n in objects %}
+      <tr>
+        <td>{{ n.device.display_name }}</td>
+        <td>{{ n.local_port }}</td>
+        <td>{{ n.neighbor_device }}</td>
+        <td>{{ n.neighbor_port }}</td>
+        <td style="color:#484f58">{{ n.collected_at|date:"Y-m-d H:i:s" }}</td>
+      </tr>
+      {% empty %}<tr><td colspan="5" class="empty" style="padding:.75rem">No LLDP neighbors found.</td></tr>{% endfor %}
     </tbody>
   </table>
   </main>

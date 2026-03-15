@@ -1,6 +1,6 @@
 from django.contrib import admin, messages
 
-from .models import ArpEntry, BgpSession, Device, Interface, IPv4Route, PollResult, PollingTask, TaskLog
+from .models import ArpEntry, BgpSession, Device, Interface, IPv4Route, LldpNeighbor, PollResult, PollingTask, TaskLog
 from .tasks import run_polling_task
 
 
@@ -63,12 +63,20 @@ class BgpSessionAdmin(admin.ModelAdmin):
     readonly_fields = ("device", "vrf", "peer_ip", "peer_asn", "peer_state", "prefixes_received", "prefixes_accepted", "updown_time", "collected_at")
 
 
+@admin.register(LldpNeighbor)
+class LldpNeighborAdmin(admin.ModelAdmin):
+    list_display = ("device", "local_port", "neighbor_device", "neighbor_port", "collected_at")
+    list_filter = ("device",)
+    search_fields = ("local_port", "neighbor_device", "neighbor_port", "device__hostname", "device__ip_address")
+    readonly_fields = ("device", "local_port", "neighbor_device", "neighbor_port", "collected_at")
+
+
 @admin.register(PollResult)
 class PollResultAdmin(admin.ModelAdmin):
-    list_display = ("started_at", "device", "check_type", "duration_ms", "success", "job_id")
-    list_filter = ("success", "check_type", "device")
-    search_fields = ("job_id", "device__hostname", "device__ip_address")
-    readonly_fields = ("device", "job_id", "check_type", "started_at", "duration_ms", "success")
+    list_display = ("started_at", "check_type", "duration_ms", "success", "job_id")
+    list_filter = ("success", "check_type")
+    search_fields = ("job_id",)
+    readonly_fields = ("job_id", "check_type", "started_at", "duration_ms", "success")
 
 
 @admin.register(PollingTask)
