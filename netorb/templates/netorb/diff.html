@@ -152,11 +152,11 @@ th.filter-row select:focus { outline: none; border-color: #58a6ff; }
       <td>{% if row.t2 %}{{ row.t2.device.display_name }}{% else %}{{ row.t1.device.display_name }}{% endif %}</td>
       <td>{% if row.t2 %}{{ row.t2.prefix }}{% else %}{{ row.t1.prefix }}{% endif %}</td>
       <td>
-        {% if row.t1 %}{% for nh in row.t1.next_hops %}<span class="next-hop">{{ nh }}</span>{% empty %}<span class="dash">directly connected</span>{% endfor %}
+        {% if row.t1 %}{% for nh in row.t1.next_hops %}<span class="next-hop">{{ nh.nexthop }} via {{ nh.interface }}</span>{% empty %}<span class="dash">directly connected</span>{% endfor %}
         {% else %}<span class="dash">—</span>{% endif %}
       </td>
       <td>
-        {% if row.t2 %}{% for nh in row.t2.next_hops %}<span class="next-hop">{{ nh }}</span>{% empty %}<span class="dash">directly connected</span>{% endfor %}
+        {% if row.t2 %}{% for nh in row.t2.next_hops %}<span class="next-hop">{{ nh.nexthop }} via {{ nh.interface }}</span>{% empty %}<span class="dash">directly connected</span>{% endfor %}
         {% else %}<span class="dash">—</span>{% endif %}
       </td>
     </tr>

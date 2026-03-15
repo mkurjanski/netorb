@@ -11,10 +11,11 @@ from rest_framework import filters
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
 from django.apps import apps
-from django.db.models import Count, Func, Q, TextField, Value
+from django.db.models import Count, Func, Q, TextField
 
 from .models import ArpEntry, BgpSession, Device, Interface, IPv4Route, PollResult, TaskLog
 from .serializers import InterfaceSerializer, IPv4RouteSerializer
+from .services import trace_path
 
 # ---------------------------------------------------------------------------
 # Diff helpers
@@ -86,7 +87,7 @@ def _filter_diff_by_device(rows, ip_address):
 def _filter_by_nexthop(qs, value):
     """Filter routes where any next hop contains *value* (case-insensitive)."""
     return qs.annotate(
-        _nh_str=Func("next_hops", Value(" "), function="array_to_string", output_field=TextField())
+        _nh_str=Func("next_hops", function="CAST", template="%(expressions)s::text", output_field=TextField())
     ).filter(_nh_str__icontains=value)
 
 class InterfaceViewSet(ReadOnlyModelViewSet):
@@ -467,7 +468,7 @@ def diff(request):
         IPv4RouteEvent = apps.get_model("netorb", "IPv4RouteEvent")
         s1 = _snapshot_at(IPv4RouteEvent, t1)
         s2 = _snapshot_at(IPv4RouteEvent, t2)
-        rows = _build_diff(s1, s2, lambda a, b: set(a.next_hops) != set(b.next_hops))
+        rows = _build_diff(s1, s2, lambda a, b: sorted(a.next_hops, key=str) != sorted(b.next_hops, key=str))
         if f_device:
             rows = _filter_diff_by_device(rows, f_device)
         ctx["diff_rows"] = _sort_diff(rows, "prefix")
@@ -603,3 +604,26 @@ def log_stream(request):
     response["Cache-Control"] = "no-cache"
     response["X-Accel-Buffering"] = "no"
     return response
+
+
+def path_tracer(request):
+    devices = Device.objects.order_by("ip_address")
+    source_ip = request.GET.get("source", "")
+    dest_ip = request.GET.get("destination", "")
+    paths = None
+
+    if source_ip and dest_ip:
+        try:
+            source = Device.objects.get(ip_address=source_ip)
+        except Device.DoesNotExist:
+            source = None
+
+        if source:
+            paths = trace_path(source, dest_ip)
+
+    return render(request, "netorb/path_tracer.html", {
+        "devices": devices,
+        "source_ip": source_ip,
+        "dest_ip": dest_ip,
+        "paths": paths,
+    })

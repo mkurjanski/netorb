@@ -13,7 +13,7 @@ class InterfaceSerializer(serializers.ModelSerializer):
 
 class IPv4RouteSerializer(serializers.ModelSerializer):
     device = serializers.StringRelatedField()
-    next_hops = serializers.ListField(child=serializers.IPAddressField())
+    next_hops = serializers.JSONField()
 
     class Meta:
         model = IPv4Route

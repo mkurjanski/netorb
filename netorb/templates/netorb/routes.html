@@ -67,7 +67,7 @@ th.filter-row input:focus, th.filter-row select:focus {
           <td>{{ route.prefix }}</td>
           <td>
             {% for nh in route.next_hops %}
-              <span class="next-hop">{{ nh }}</span>
+              <span class="next-hop">{{ nh.nexthop }} via {{ nh.interface }}</span>
             {% empty %}
               <span style="color:#484f58">directly connected</span>
             {% endfor %}

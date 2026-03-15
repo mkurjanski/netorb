@@ -1,5 +1,4 @@
 import pghistory
-from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from netfields import CidrAddressField
 
@@ -108,11 +107,10 @@ class IPv4Route(models.Model):
     prefix = CidrAddressField(
         help_text="Destination prefix in CIDR notation (e.g. 10.0.0.0/24).",
     )
-    next_hops = ArrayField(
-        models.GenericIPAddressField(protocol="IPv4"),
+    next_hops = models.JSONField(
         default=list,
         blank=True,
-        help_text="List of next-hop IPv4 addresses (empty for directly connected routes).",
+        help_text='List of next-hop objects, e.g. [{"nexthop": "10.0.0.1", "interface": "Ethernet1"}].',
     )
     collected_at = models.DateTimeField(
         auto_now=True,

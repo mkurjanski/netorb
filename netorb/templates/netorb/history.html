@@ -128,7 +128,7 @@ th.filter-row input:focus, th.filter-row select:focus { outline: none; border-co
         <td><span class="badge badge-{{ e.pgh_label }}">{{ e.pgh_label }}</span></td>
         <td>{{ e.device.display_name }}</td>
         <td>{{ e.prefix }}</td>
-        <td>{% for nh in e.next_hops %}<span class="next-hop">{{ nh }}</span>{% empty %}<span style="color:#484f58">directly connected</span>{% endfor %}</td>
+        <td>{% for nh in e.next_hops %}<span class="next-hop">{{ nh.nexthop }} via {{ nh.interface }}</span>{% empty %}<span style="color:#484f58">directly connected</span>{% endfor %}</td>
       </tr>
       {% empty %}<tr><td colspan="5" class="empty" style="padding:.75rem">No route events found.</td></tr>{% endfor %}
     </tbody>
