@@ -9,6 +9,8 @@ router.register("routes", views.IPv4RouteViewSet, basename="route")
 
 urlpatterns = [
     path("", views.home, name="home"),
+    path("interfaces/", views.InterfaceListView.as_view(), name="interfaces"),
+    path("routes/", views.RouteListView.as_view(), name="routes"),
     path("logs/", views.log_page, name="log-page"),
     path("tasks/", views.tasks, name="tasks"),
     path("poll-results/", views.poll_results, name="poll-results"),

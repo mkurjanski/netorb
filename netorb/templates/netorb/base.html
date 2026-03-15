@@ -38,6 +38,8 @@
 
 <nav>
   <a href="/" {% if request.resolver_match.url_name == 'home' %}class="active"{% endif %}>Home</a>
+  <a href="/interfaces/" {% if request.resolver_match.url_name == 'interfaces' %}class="active"{% endif %}>Interfaces</a>
+  <a href="/routes/" {% if request.resolver_match.url_name == 'routes' %}class="active"{% endif %}>Routes</a>
   <a href="/logs/" {% if request.resolver_match.url_name == 'log-page' %}class="active"{% endif %}>Logs</a>
   <a href="/poll-results/" {% if request.resolver_match.url_name == 'poll-results' %}class="active"{% endif %}>Poll Results</a>
   <a href="/tasks/" {% if request.resolver_match.url_name == 'tasks' %}class="active"{% endif %}>Tasks</a>

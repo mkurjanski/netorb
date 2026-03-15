@@ -3,9 +3,11 @@ import pathlib
 import time
 
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import StreamingHttpResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_GET
+from django.views.generic import ListView
 from rest_framework import filters
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
@@ -62,6 +64,67 @@ class IPv4RouteViewSet(ReadOnlyModelViewSet):
         if device:
             qs = qs.filter(device__hostname=device)
         return qs
+
+
+class InterfaceListView(LoginRequiredMixin, ListView):
+    model = Interface
+    template_name = "netorb/interfaces.html"
+    context_object_name = "interfaces"
+    paginate_by = 100
+
+    def get_queryset(self):
+        qs = Interface.objects.select_related("device").order_by("device__hostname", "name")
+        self.f_device = self.request.GET.get("device", "")
+        self.f_name = self.request.GET.get("name", "")
+        self.f_status = self.request.GET.get("status", "")
+        if self.f_device:
+            qs = qs.filter(device__hostname=self.f_device)
+        if self.f_name:
+            qs = qs.filter(name__icontains=self.f_name)
+        if self.f_status:
+            qs = qs.filter(oper_status=self.f_status)
+        return qs
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["devices"] = Device.objects.values_list("hostname", flat=True).order_by("hostname")
+        ctx["f_device"] = self.f_device
+        ctx["f_name"] = self.f_name
+        ctx["f_status"] = self.f_status
+        ctx["status_choices"] = Interface.OperStatus.choices
+        return ctx
+
+
+class RouteListView(LoginRequiredMixin, ListView):
+    model = IPv4Route
+    template_name = "netorb/routes.html"
+    context_object_name = "routes"
+    paginate_by = 100
+
+    def get_queryset(self):
+        qs = (
+            IPv4Route.objects.select_related("device")
+            .prefetch_related("next_hops")
+            .order_by("device__hostname", "prefix")
+        )
+        self.f_device = self.request.GET.get("device", "")
+        self.f_prefix = self.request.GET.get("prefix", "")
+        self.f_nexthop = self.request.GET.get("nexthop", "")
+        if self.f_device:
+            qs = qs.filter(device__hostname=self.f_device)
+        if self.f_prefix:
+            qs = qs.filter(prefix__startswith=self.f_prefix)
+        if self.f_nexthop:
+            qs = qs.filter(next_hops__ip_address__startswith=self.f_nexthop).distinct()
+        return qs
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["devices"] = Device.objects.values_list("hostname", flat=True).order_by("hostname")
+        ctx["f_device"] = self.f_device
+        ctx["f_prefix"] = self.f_prefix
+        ctx["f_nexthop"] = self.f_nexthop
+        return ctx
 
 
 _SSE_TIMEOUT_SECONDS = 120
