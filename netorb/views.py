@@ -13,7 +13,7 @@ from rest_framework.viewsets import ReadOnlyModelViewSet
 
 from django.db.models import Count, Q
 
-from .models import BgpSession, Device, Interface, IPv4Route, PollResult, TaskLog
+from .models import ArpEntry, BgpSession, Device, Interface, IPv4Route, PollResult, TaskLog
 from .serializers import InterfaceSerializer, IPv4RouteSerializer
 
 class InterfaceViewSet(ReadOnlyModelViewSet):
@@ -124,6 +124,38 @@ class RouteListView(LoginRequiredMixin, ListView):
         ctx["f_device"] = self.f_device
         ctx["f_prefix"] = self.f_prefix
         ctx["f_nexthop"] = self.f_nexthop
+        return ctx
+
+
+class ArpEntryListView(LoginRequiredMixin, ListView):
+    model = ArpEntry
+    template_name = "netorb/arp.html"
+    context_object_name = "entries"
+    paginate_by = 100
+
+    def get_queryset(self):
+        qs = ArpEntry.objects.select_related("device").order_by("device__hostname", "ip_address")
+        self.f_device = self.request.GET.get("device", "")
+        self.f_ip = self.request.GET.get("ip", "")
+        self.f_mac = self.request.GET.get("mac", "")
+        self.f_interface = self.request.GET.get("interface", "")
+        if self.f_device:
+            qs = qs.filter(device__hostname=self.f_device)
+        if self.f_ip:
+            qs = qs.filter(ip_address__startswith=self.f_ip)
+        if self.f_mac:
+            qs = qs.filter(mac_address__icontains=self.f_mac)
+        if self.f_interface:
+            qs = qs.filter(interface__icontains=self.f_interface)
+        return qs
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["devices"] = Device.objects.values_list("hostname", flat=True).order_by("hostname")
+        ctx["f_device"] = self.f_device
+        ctx["f_ip"] = self.f_ip
+        ctx["f_mac"] = self.f_mac
+        ctx["f_interface"] = self.f_interface
         return ctx
 
 

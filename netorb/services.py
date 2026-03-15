@@ -12,6 +12,7 @@ import json
 import logging
 import time
 from contextlib import contextmanager
+from datetime import datetime, timezone as dt_timezone
 
 from django.conf import settings
 from django.utils import timezone
@@ -26,7 +27,7 @@ from nornir_netmiko.tasks import netmiko_send_command
 ConnectionPluginRegister.register("netmiko", NetmikoPlugin)
 
 from .log_handler import DBLogHandler
-from .models import BgpSession, Device, Interface, IPv4Route, NextHop, PollResult
+from .models import ArpEntry, BgpSession, Device, Interface, IPv4Route, NextHop, PollResult
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +76,7 @@ def task_interfaces(task, device: Device) -> None:
     for name, attrs in raw.get("interfaces", {}).items():
         status = (
             Interface.OperStatus.UP
-            if attrs.get("lineProtocolStatus") == "connected"
+            if attrs.get("lineProtocolStatus") == "up"
             else Interface.OperStatus.DOWN
         )
         Interface.objects.update_or_create(
@@ -123,9 +124,34 @@ def task_bgp_sessions(task, device: Device) -> None:
                     "peer_state": peer.get("peerState", BgpSession.PeerState.UNKNOWN),
                     "prefixes_received": peer.get("prefixReceived", 0),
                     "prefixes_accepted": peer.get("prefixAccepted", 0),
-                    "updown_time": timezone.datetime.fromtimestamp(updown_time, tz=timezone.utc) if updown_time else None,
+                    "updown_time": datetime.fromtimestamp(updown_time, tz=dt_timezone.utc) if updown_time else None,
                 },
             )
+
+
+def task_arp(task, device: Device) -> None:
+    """Nornir parent task: collect ARP table and sync to DB."""
+    result = task.run(
+        task=netmiko_send_command,
+        command_string="show ip arp | json",
+    )
+    data = json.loads(result[0].result)
+    neighbors = data.get("ipV4Neighbors", [])
+
+    # Full replace — remove stale entries then upsert current ones.
+    current_ips = {entry["address"] for entry in neighbors}
+    ArpEntry.objects.filter(device=device).exclude(ip_address__in=current_ips).delete()
+
+    for entry in neighbors:
+        ArpEntry.objects.update_or_create(
+            device=device,
+            ip_address=entry["address"],
+            defaults={
+                "mac_address": entry.get("hwAddress", ""),
+                "interface": entry.get("interface", ""),
+                "age": entry.get("age", 0),
+            },
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -136,6 +162,7 @@ _TASK_MAP = {
     PollResult.CheckType.INTERFACES: task_interfaces,
     PollResult.CheckType.ROUTES: task_routes,
     PollResult.CheckType.BGP_SESSIONS: task_bgp_sessions,
+    PollResult.CheckType.ARP: task_arp,
 }
 
 

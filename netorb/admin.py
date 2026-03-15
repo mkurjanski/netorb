@@ -1,6 +1,6 @@
 from django.contrib import admin, messages
 
-from .models import BgpSession, Device, Interface, IPv4Route, NextHop, PollResult, PollingTask, TaskLog
+from .models import ArpEntry, BgpSession, Device, Interface, IPv4Route, NextHop, PollResult, PollingTask, TaskLog
 from .tasks import run_polling_task
 
 
@@ -58,6 +58,14 @@ class IPv4RouteAdmin(admin.ModelAdmin):
 class NextHopAdmin(admin.ModelAdmin):
     list_display = ("route", "ip_address")
     search_fields = ("ip_address", "route__prefix", "route__device__hostname")
+
+
+@admin.register(ArpEntry)
+class ArpEntryAdmin(admin.ModelAdmin):
+    list_display = ("device", "ip_address", "mac_address", "interface", "age", "collected_at")
+    list_filter = ("device", "interface")
+    search_fields = ("ip_address", "mac_address", "device__hostname")
+    readonly_fields = ("device", "ip_address", "mac_address", "interface", "age", "collected_at")
 
 
 @admin.register(BgpSession)

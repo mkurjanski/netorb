@@ -138,6 +138,7 @@ class PollingTask(models.Model):
         INTERFACES = "interfaces", "Interfaces"
         ROUTES = "routes", "Routes"
         BGP_SESSIONS = "bgp_sessions", "BGP Sessions"
+        ARP = "arp", "ARP"
 
     name = models.CharField(
         max_length=100,
@@ -237,11 +238,54 @@ class BgpSession(models.Model):
         return f"{self.device.hostname} / {self.vrf} / {self.peer_ip} ({self.peer_state})"
 
 
+class ArpEntry(models.Model):
+    device = models.ForeignKey(
+        Device,
+        on_delete=models.CASCADE,
+        related_name="arp_entries",
+        help_text="Device this ARP entry was collected from.",
+    )
+    ip_address = models.GenericIPAddressField(
+        protocol="IPv4",
+        help_text="IP address of the ARP entry.",
+    )
+    mac_address = models.CharField(
+        max_length=32,
+        help_text="MAC address in EOS dot-notation (e.g. aac1.ab30.123b).",
+    )
+    interface = models.CharField(
+        max_length=64,
+        help_text="Interface the ARP entry was learned on.",
+    )
+    age = models.PositiveIntegerField(
+        help_text="Age of the ARP entry in seconds.",
+    )
+    collected_at = models.DateTimeField(
+        auto_now=True,
+        help_text="Timestamp of the last data collection.",
+    )
+
+    class Meta:
+        ordering = ["device", "ip_address"]
+        verbose_name = "ARP Entry"
+        verbose_name_plural = "ARP Entries"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["device", "ip_address"],
+                name="unique_device_arp_ip",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.device.hostname} / {self.ip_address} / {self.mac_address}"
+
+
 class PollResult(models.Model):
     class CheckType(models.TextChoices):
         INTERFACES = "interfaces", "Interfaces"
         ROUTES = "routes", "Routes"
         BGP_SESSIONS = "bgp_sessions", "BGP Sessions"
+        ARP = "arp", "ARP"
 
     device = models.ForeignKey(
         Device,

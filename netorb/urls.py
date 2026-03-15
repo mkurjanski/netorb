@@ -11,6 +11,7 @@ urlpatterns = [
     path("", views.home, name="home"),
     path("interfaces/", views.InterfaceListView.as_view(), name="interfaces"),
     path("routes/", views.RouteListView.as_view(), name="routes"),
+    path("arp/", views.ArpEntryListView.as_view(), name="arp"),
     path("bgp-sessions/", views.BgpSessionListView.as_view(), name="bgp-sessions"),
     path("logs/", views.log_page, name="log-page"),
     path("tasks/", views.tasks, name="tasks"),
