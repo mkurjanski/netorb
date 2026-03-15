@@ -1,9 +1,8 @@
+import datetime as dt
 import json
 import pathlib
 import time
 
-from django.contrib.auth.decorators import login_required
-from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import StreamingHttpResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_GET
@@ -16,6 +15,73 @@ from django.db.models import Count, Func, Q, TextField, Value
 
 from .models import ArpEntry, BgpSession, Device, Interface, IPv4Route, PollResult, TaskLog
 from .serializers import InterfaceSerializer, IPv4RouteSerializer
+
+# ---------------------------------------------------------------------------
+# Diff helpers
+# ---------------------------------------------------------------------------
+
+def _parse_diff_time(value: str, default: dt.datetime) -> dt.datetime:
+    """Parse a datetime-local string (YYYY-MM-DDTHH:MM) or '' / 'now' → default."""
+    from django.utils import timezone as tz
+    if not value or value.strip().lower() == "now":
+        return default
+    try:
+        parsed = dt.datetime.fromisoformat(value)
+        return tz.make_aware(parsed) if tz.is_naive(parsed) else parsed
+    except ValueError:
+        return default
+
+
+def _snapshot_at(EventModel, timestamp):
+    """
+    Return {pgh_obj_id: event_row} for the latest state of every object
+    at or before *timestamp*. Objects whose latest event is a delete are
+    excluded (they did not exist at that point in time).
+    """
+    qs = (
+        EventModel.objects
+        .filter(pgh_created_at__lte=timestamp)
+        .order_by("pgh_obj_id", "-pgh_created_at")
+        .distinct("pgh_obj_id")
+        .select_related("device")
+    )
+    return {e.pgh_obj_id: e for e in qs if e.pgh_label != "delete"}
+
+
+def _build_diff(s1, s2, differ_fn):
+    """
+    Compare two snapshots and return a list of dicts with keys:
+      status  – 'added' | 'removed' | 'changed'
+      t1      – event row at T1 (None if added)
+      t2      – event row at T2 (None if removed)
+    """
+    k1, k2 = set(s1), set(s2)
+    rows = []
+    for pk in k2 - k1:
+        rows.append({"status": "added",   "t1": None,   "t2": s2[pk]})
+    for pk in k1 - k2:
+        rows.append({"status": "removed", "t1": s1[pk], "t2": None})
+    for pk in k1 & k2:
+        if differ_fn(s1[pk], s2[pk]):
+            rows.append({"status": "changed", "t1": s1[pk], "t2": s2[pk]})
+    return rows
+
+
+def _sort_diff(rows, *key_attrs):
+    order = {"changed": 0, "added": 1, "removed": 2}
+    def sort_key(r):
+        obj = r["t2"] or r["t1"]
+        return (order[r["status"]], obj.device.ip_address) + tuple(str(getattr(obj, a)) for a in key_attrs)
+    return sorted(rows, key=sort_key)
+
+
+def _filter_diff_by_device(rows, ip_address):
+    return [
+        r for r in rows
+        if (r["t1"] and r["t1"].device.ip_address == ip_address)
+        or (r["t2"] and r["t2"].device.ip_address == ip_address)
+    ]
+
 
 def _filter_by_nexthop(qs, value):
     """Filter routes where any next hop contains *value* (case-insensitive)."""
@@ -35,14 +101,14 @@ class InterfaceViewSet(ReadOnlyModelViewSet):
 
     serializer_class = InterfaceSerializer
     filter_backends = [filters.SearchFilter]
-    search_fields = ["name", "device__hostname"]
+    search_fields = ["name", "device__hostname", "device__ip_address"]
 
     def get_queryset(self):
-        qs = Interface.objects.select_related("device").order_by("device__hostname", "name")
+        qs = Interface.objects.select_related("device").order_by("device__ip_address", "name")
         device = self.request.query_params.get("device")
         oper_status = self.request.query_params.get("oper_status")
         if device:
-            qs = qs.filter(device__hostname=device)
+            qs = qs.filter(device__ip_address=device)
         if oper_status:
             qs = qs.filter(oper_status=oper_status)
         return qs
@@ -59,29 +125,29 @@ class IPv4RouteViewSet(ReadOnlyModelViewSet):
 
     serializer_class = IPv4RouteSerializer
     filter_backends = [filters.SearchFilter]
-    search_fields = ["device__hostname"]
+    search_fields = ["device__hostname", "device__ip_address"]
 
     def get_queryset(self):
-        qs = IPv4Route.objects.select_related("device").order_by("device__hostname", "prefix")
+        qs = IPv4Route.objects.select_related("device").order_by("device__ip_address", "prefix")
         device = self.request.query_params.get("device")
         if device:
-            qs = qs.filter(device__hostname=device)
+            qs = qs.filter(device__ip_address=device)
         return qs
 
 
-class InterfaceListView(LoginRequiredMixin, ListView):
+class InterfaceListView(ListView):
     model = Interface
     template_name = "netorb/interfaces.html"
     context_object_name = "interfaces"
     paginate_by = 100
 
     def get_queryset(self):
-        qs = Interface.objects.select_related("device").order_by("device__hostname", "name")
+        qs = Interface.objects.select_related("device").order_by("device__ip_address", "name")
         self.f_device = self.request.GET.get("device", "")
         self.f_name = self.request.GET.get("name", "")
         self.f_status = self.request.GET.get("status", "")
         if self.f_device:
-            qs = qs.filter(device__hostname=self.f_device)
+            qs = qs.filter(device__ip_address=self.f_device)
         if self.f_name:
             qs = qs.filter(name__icontains=self.f_name)
         if self.f_status:
@@ -90,7 +156,7 @@ class InterfaceListView(LoginRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx["devices"] = Device.objects.values_list("hostname", flat=True).order_by("hostname")
+        ctx["devices"] = Device.objects.order_by("ip_address")
         ctx["f_device"] = self.f_device
         ctx["f_name"] = self.f_name
         ctx["f_status"] = self.f_status
@@ -98,19 +164,19 @@ class InterfaceListView(LoginRequiredMixin, ListView):
         return ctx
 
 
-class RouteListView(LoginRequiredMixin, ListView):
+class RouteListView(ListView):
     model = IPv4Route
     template_name = "netorb/routes.html"
     context_object_name = "routes"
     paginate_by = 100
 
     def get_queryset(self):
-        qs = IPv4Route.objects.select_related("device").order_by("device__hostname", "prefix")
+        qs = IPv4Route.objects.select_related("device").order_by("device__ip_address", "prefix")
         self.f_device = self.request.GET.get("device", "")
         self.f_prefix = self.request.GET.get("prefix", "")
         self.f_nexthop = self.request.GET.get("nexthop", "")
         if self.f_device:
-            qs = qs.filter(device__hostname=self.f_device)
+            qs = qs.filter(device__ip_address=self.f_device)
         if self.f_prefix:
             qs = qs.filter(prefix__startswith=self.f_prefix)
         if self.f_nexthop:
@@ -119,7 +185,7 @@ class RouteListView(LoginRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx["devices"] = Device.objects.values_list("hostname", flat=True).order_by("hostname")
+        ctx["devices"] = Device.objects.order_by("ip_address")
         ctx["f_device"] = self.f_device
         ctx["f_prefix"] = self.f_prefix
         ctx["f_nexthop"] = self.f_nexthop
@@ -129,22 +195,21 @@ class RouteListView(LoginRequiredMixin, ListView):
 _LATEST_TABS = ["interfaces", "routes", "arp", "bgp_sessions"]
 
 
-@login_required
 def latest(request):
     tab = request.GET.get("tab", "interfaces")
     if tab not in _LATEST_TABS:
         tab = "interfaces"
 
-    devices = Device.objects.values_list("hostname", flat=True).order_by("hostname")
+    devices = Device.objects.order_by("ip_address")
     f_device = request.GET.get("device", "")
     ctx = {"tab": tab, "devices": devices, "f_device": f_device}
 
     if tab == "interfaces":
-        qs = Interface.objects.select_related("device").order_by("device__hostname", "name")
+        qs = Interface.objects.select_related("device").order_by("device__ip_address", "name")
         f_name = request.GET.get("name", "")
         f_status = request.GET.get("status", "")
         if f_device:
-            qs = qs.filter(device__hostname=f_device)
+            qs = qs.filter(device__ip_address=f_device)
         if f_name:
             qs = qs.filter(name__icontains=f_name)
         if f_status:
@@ -153,11 +218,11 @@ def latest(request):
                     "status_choices": Interface.OperStatus.choices})
 
     elif tab == "routes":
-        qs = IPv4Route.objects.select_related("device").order_by("device__hostname", "prefix")
+        qs = IPv4Route.objects.select_related("device").order_by("device__ip_address", "prefix")
         f_prefix = request.GET.get("prefix", "")
         f_nexthop = request.GET.get("nexthop", "")
         if f_device:
-            qs = qs.filter(device__hostname=f_device)
+            qs = qs.filter(device__ip_address=f_device)
         if f_prefix:
             qs = qs.filter(prefix__startswith=f_prefix)
         if f_nexthop:
@@ -165,12 +230,12 @@ def latest(request):
         ctx.update({"objects": qs, "f_prefix": f_prefix, "f_nexthop": f_nexthop})
 
     elif tab == "arp":
-        qs = ArpEntry.objects.select_related("device").order_by("device__hostname", "ip_address")
+        qs = ArpEntry.objects.select_related("device").order_by("device__ip_address", "ip_address")
         f_ip = request.GET.get("ip", "")
         f_mac = request.GET.get("mac", "")
         f_interface = request.GET.get("interface", "")
         if f_device:
-            qs = qs.filter(device__hostname=f_device)
+            qs = qs.filter(device__ip_address=f_device)
         if f_ip:
             qs = qs.filter(ip_address__startswith=f_ip)
         if f_mac:
@@ -180,13 +245,13 @@ def latest(request):
         ctx.update({"objects": qs, "f_ip": f_ip, "f_mac": f_mac, "f_interface": f_interface})
 
     elif tab == "bgp_sessions":
-        qs = BgpSession.objects.select_related("device").order_by("device__hostname", "vrf", "peer_ip")
+        qs = BgpSession.objects.select_related("device").order_by("device__ip_address", "vrf", "peer_ip")
         f_vrf = request.GET.get("vrf", "")
         f_peer_ip = request.GET.get("peer_ip", "")
         f_peer_asn = request.GET.get("peer_asn", "")
         f_state = request.GET.get("state", "")
         if f_device:
-            qs = qs.filter(device__hostname=f_device)
+            qs = qs.filter(device__ip_address=f_device)
         if f_vrf:
             qs = qs.filter(vrf__icontains=f_vrf)
         if f_peer_ip:
@@ -202,20 +267,20 @@ def latest(request):
     return render(request, "netorb/latest.html", ctx)
 
 
-class ArpEntryListView(LoginRequiredMixin, ListView):
+class ArpEntryListView(ListView):
     model = ArpEntry
     template_name = "netorb/arp.html"
     context_object_name = "entries"
     paginate_by = 100
 
     def get_queryset(self):
-        qs = ArpEntry.objects.select_related("device").order_by("device__hostname", "ip_address")
+        qs = ArpEntry.objects.select_related("device").order_by("device__ip_address", "ip_address")
         self.f_device = self.request.GET.get("device", "")
         self.f_ip = self.request.GET.get("ip", "")
         self.f_mac = self.request.GET.get("mac", "")
         self.f_interface = self.request.GET.get("interface", "")
         if self.f_device:
-            qs = qs.filter(device__hostname=self.f_device)
+            qs = qs.filter(device__ip_address=self.f_device)
         if self.f_ip:
             qs = qs.filter(ip_address__startswith=self.f_ip)
         if self.f_mac:
@@ -226,7 +291,7 @@ class ArpEntryListView(LoginRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx["devices"] = Device.objects.values_list("hostname", flat=True).order_by("hostname")
+        ctx["devices"] = Device.objects.order_by("ip_address")
         ctx["f_device"] = self.f_device
         ctx["f_ip"] = self.f_ip
         ctx["f_mac"] = self.f_mac
@@ -234,21 +299,21 @@ class ArpEntryListView(LoginRequiredMixin, ListView):
         return ctx
 
 
-class BgpSessionListView(LoginRequiredMixin, ListView):
+class BgpSessionListView(ListView):
     model = BgpSession
     template_name = "netorb/bgp_sessions.html"
     context_object_name = "sessions"
     paginate_by = 100
 
     def get_queryset(self):
-        qs = BgpSession.objects.select_related("device").order_by("device__hostname", "vrf", "peer_ip")
+        qs = BgpSession.objects.select_related("device").order_by("device__ip_address", "vrf", "peer_ip")
         self.f_device = self.request.GET.get("device", "")
         self.f_vrf = self.request.GET.get("vrf", "")
         self.f_peer_ip = self.request.GET.get("peer_ip", "")
         self.f_peer_asn = self.request.GET.get("peer_asn", "")
         self.f_state = self.request.GET.get("state", "")
         if self.f_device:
-            qs = qs.filter(device__hostname=self.f_device)
+            qs = qs.filter(device__ip_address=self.f_device)
         if self.f_vrf:
             qs = qs.filter(vrf__icontains=self.f_vrf)
         if self.f_peer_ip:
@@ -261,7 +326,7 @@ class BgpSessionListView(LoginRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx["devices"] = Device.objects.values_list("hostname", flat=True).order_by("hostname")
+        ctx["devices"] = Device.objects.order_by("ip_address")
         ctx["state_choices"] = BgpSession.PeerState.choices
         ctx["f_device"] = self.f_device
         ctx["f_vrf"] = self.f_vrf
@@ -275,13 +340,12 @@ _HISTORY_TABS = ["interfaces", "routes", "arp", "bgp_sessions"]
 _EVENT_LABELS = [("insert", "Insert"), ("update", "Update"), ("delete", "Delete")]
 
 
-@login_required
 def history(request):
     tab = request.GET.get("tab", "interfaces")
     if tab not in _HISTORY_TABS:
         tab = "interfaces"
 
-    devices = Device.objects.values_list("hostname", flat=True).order_by("hostname")
+    devices = Device.objects.order_by("ip_address")
     f_device = request.GET.get("device", "")
     f_event = request.GET.get("event", "")
     ctx = {
@@ -298,7 +362,7 @@ def history(request):
         f_name = request.GET.get("name", "")
         f_status = request.GET.get("status", "")
         if f_device:
-            qs = qs.filter(device__hostname=f_device)
+            qs = qs.filter(device__ip_address=f_device)
         if f_event:
             qs = qs.filter(pgh_label=f_event)
         if f_name:
@@ -317,7 +381,7 @@ def history(request):
         qs = IPv4RouteEvent.objects.select_related("device").order_by("-pgh_created_at")
         f_prefix = request.GET.get("prefix", "")
         if f_device:
-            qs = qs.filter(device__hostname=f_device)
+            qs = qs.filter(device__ip_address=f_device)
         if f_event:
             qs = qs.filter(pgh_label=f_event)
         if f_prefix:
@@ -330,7 +394,7 @@ def history(request):
         f_ip = request.GET.get("ip", "")
         f_mac = request.GET.get("mac", "")
         if f_device:
-            qs = qs.filter(device__hostname=f_device)
+            qs = qs.filter(device__ip_address=f_device)
         if f_event:
             qs = qs.filter(pgh_label=f_event)
         if f_ip:
@@ -345,7 +409,7 @@ def history(request):
         f_peer_ip = request.GET.get("peer_ip", "")
         f_state = request.GET.get("state", "")
         if f_device:
-            qs = qs.filter(device__hostname=f_device)
+            qs = qs.filter(device__ip_address=f_device)
         if f_event:
             qs = qs.filter(pgh_label=f_event)
         if f_peer_ip:
@@ -362,17 +426,90 @@ def history(request):
     return render(request, "netorb/history.html", ctx)
 
 
+_STATUS_ORDER = {"changed": 0, "added": 1, "removed": 2}
+
+
+def diff(request):
+    from django.utils import timezone as tz
+
+    tab = request.GET.get("tab", "interfaces")
+    if tab not in _HISTORY_TABS:
+        tab = "interfaces"
+
+    now = tz.now()
+    t1 = _parse_diff_time(request.GET.get("t1", ""), default=now - dt.timedelta(hours=24))
+    t2 = _parse_diff_time(request.GET.get("t2", ""), default=now)
+
+    fmt = lambda d: d.strftime("%Y-%m-%dT%H:%M")
+    devices = Device.objects.order_by("ip_address")
+    f_device = request.GET.get("device", "")
+
+    ctx = {
+        "tab": tab,
+        "t1": fmt(t1),
+        "t2": fmt(t2),
+        "t1_raw": request.GET.get("t1", ""),
+        "t2_raw": request.GET.get("t2", ""),
+        "devices": devices,
+        "f_device": f_device,
+    }
+
+    if tab == "interfaces":
+        InterfaceEvent = apps.get_model("netorb", "InterfaceEvent")
+        s1 = _snapshot_at(InterfaceEvent, t1)
+        s2 = _snapshot_at(InterfaceEvent, t2)
+        rows = _build_diff(s1, s2, lambda a, b: a.oper_status != b.oper_status)
+        if f_device:
+            rows = _filter_diff_by_device(rows, f_device)
+        ctx["diff_rows"] = _sort_diff(rows, "name")
+
+    elif tab == "routes":
+        IPv4RouteEvent = apps.get_model("netorb", "IPv4RouteEvent")
+        s1 = _snapshot_at(IPv4RouteEvent, t1)
+        s2 = _snapshot_at(IPv4RouteEvent, t2)
+        rows = _build_diff(s1, s2, lambda a, b: set(a.next_hops) != set(b.next_hops))
+        if f_device:
+            rows = _filter_diff_by_device(rows, f_device)
+        ctx["diff_rows"] = _sort_diff(rows, "prefix")
+
+    elif tab == "arp":
+        ArpEntryEvent = apps.get_model("netorb", "ArpEntryEvent")
+        s1 = _snapshot_at(ArpEntryEvent, t1)
+        s2 = _snapshot_at(ArpEntryEvent, t2)
+        # age excluded — it changes every poll and would create noise
+        rows = _build_diff(s1, s2, lambda a, b: a.mac_address != b.mac_address or a.interface != b.interface)
+        if f_device:
+            rows = _filter_diff_by_device(rows, f_device)
+        ctx["diff_rows"] = _sort_diff(rows, "ip_address")
+
+    elif tab == "bgp_sessions":
+        BgpSessionEvent = apps.get_model("netorb", "BgpSessionEvent")
+        s1 = _snapshot_at(BgpSessionEvent, t1)
+        s2 = _snapshot_at(BgpSessionEvent, t2)
+        rows = _build_diff(s1, s2, lambda a, b: (
+            a.peer_state != b.peer_state
+            or a.peer_asn != b.peer_asn
+            or a.prefixes_received != b.prefixes_received
+            or a.prefixes_accepted != b.prefixes_accepted
+        ))
+        if f_device:
+            rows = _filter_diff_by_device(rows, f_device)
+        ctx["diff_rows"] = _sort_diff(rows, "vrf", "peer_ip")
+        ctx["state_choices"] = BgpSession.PeerState.choices
+
+    return render(request, "netorb/diff.html", ctx)
+
+
 _SSE_TIMEOUT_SECONDS = 120
 _SSE_POLL_INTERVAL = 1
 
 
-@login_required
 def home(request):
     devices = Device.objects.annotate(
         interface_count=Count("interfaces", distinct=True),
         interfaces_up=Count("interfaces", filter=Q(interfaces__oper_status="up"), distinct=True),
         route_count=Count("ipv4_routes", distinct=True),
-    ).order_by("hostname")
+    ).order_by("ip_address")
 
     context = {
         "device_count": Device.objects.count(),
@@ -387,7 +524,6 @@ _TASK_FILES = ["services.py", "tasks.py"]
 _APP_DIR = pathlib.Path(__file__).parent
 
 
-@login_required
 def tasks(request):
     active_file = request.GET.get("file", _TASK_FILES[0])
     if active_file not in _TASK_FILES:
@@ -400,16 +536,15 @@ def tasks(request):
     })
 
 
-@login_required
 def poll_results(request):
     qs = PollResult.objects.select_related("device").order_by("-started_at")
     selected_device = request.GET.get("device", "")
     selected_type = request.GET.get("type", "")
     if selected_device:
-        qs = qs.filter(device__hostname=selected_device)
+        qs = qs.filter(device__ip_address=selected_device)
     if selected_type:
         qs = qs.filter(check_type=selected_type)
-    devices = Device.objects.values_list("hostname", flat=True).order_by("hostname")
+    devices = Device.objects.order_by("ip_address")
     return render(request, "netorb/poll_results.html", {
         "results": qs[:200],
         "devices": devices,
@@ -418,7 +553,6 @@ def poll_results(request):
     })
 
 
-@login_required
 def log_page(request):
     """Render the live log viewer page."""
     job_ids = (
@@ -429,7 +563,6 @@ def log_page(request):
     return render(request, "netorb/logs.html", {"job_ids": job_ids})
 
 
-@login_required
 @require_GET
 def log_stream(request):
     """
@@ -454,7 +587,7 @@ def log_stream(request):
                     {
                         "id": entry.id,
                         "job_id": entry.job_id,
-                        "device": entry.device.hostname if entry.device else None,
+                        "device": entry.device.display_name if entry.device else None,
                         "level": entry.level,
                         "message": entry.message,
                         "created_at": entry.created_at.isoformat(),

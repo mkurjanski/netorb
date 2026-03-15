@@ -47,7 +47,7 @@ th.filter-row input:focus, th.filter-row select:focus {
             <select name="device" onchange="this.form.submit()">
               <option value="">— all —</option>
               {% for d in devices %}
-                <option value="{{ d }}" {% if f_device == d %}selected{% endif %}>{{ d }}</option>
+                <option value="{{ d.ip_address }}" {% if f_device == d.ip_address %}selected{% endif %}>{{ d.display_name }}</option>
               {% endfor %}
             </select>
           </th>
@@ -63,7 +63,7 @@ th.filter-row input:focus, th.filter-row select:focus {
       <tbody>
         {% for route in routes %}
         <tr>
-          <td>{{ route.device.hostname }}</td>
+          <td>{{ route.device.display_name }}</td>
           <td>{{ route.prefix }}</td>
           <td>
             {% for nh in route.next_hops %}

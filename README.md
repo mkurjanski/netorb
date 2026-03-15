@@ -125,6 +125,15 @@ node1 -- sw1 -- sw2
         sw4 -- sw3 -- node2
 ```
 
+| Hostname | IP Address | Kind |
+|---|---|---|
+| sw1 | 172.20.20.2 | cEOS |
+| sw2 | 172.20.20.3 | cEOS |
+| sw3 | 172.20.20.4 | cEOS |
+| sw4 | 172.20.20.5 | cEOS |
+| node1 | 172.20.20.4 | Linux |
+| node2 | 172.20.20.5 | Linux |
+
 ```bash
 # Import cEOS image (one-time)
 docker import cEOS64-lab-4.30.7M.tar.xz ceos:4.30.7M

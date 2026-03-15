@@ -51,15 +51,15 @@ def _db_logging(job_id: str, device: Device):
 def _make_nornir(device: Device) -> Nornir:
     """Build a single-host Nornir instance from a Device ORM object."""
     host = Host(
-        name=device.hostname,
-        hostname=device.hostname,
+        name=device.ip_address,
+        hostname=device.ip_address,
         username=settings.NORNIR_USERNAME,
         password=settings.NORNIR_PASSWORD,
         platform="arista_eos",
         groups=Groups(),
         defaults=Defaults(),
     )
-    inventory = Inventory(hosts=Hosts({device.hostname: host}), groups=Groups(), defaults=Defaults())
+    inventory = Inventory(hosts=Hosts({device.ip_address: host}), groups=Groups(), defaults=Defaults())
     return Nornir(inventory=inventory, runner=SerialRunner(), config=Config(logging={"enabled": False}))
 
 
@@ -180,7 +180,7 @@ def _run_check(nr: Nornir, device: Device, job_id: str, check_type: str) -> bool
 
     success = not results.failed
     if success:
-        logger.info("%s collection complete for %s", check_type, device.hostname)
+        logger.info("%s collection complete for %s", check_type, device.display_name)
     else:
         for host, multi in results.items():
             for result in multi:
@@ -205,5 +205,5 @@ def collect_device(device: Device, job_id: str = "", task_type: str = "interface
     """Run the appropriate Nornir task for *device* and persist results to DB."""
     with _db_logging(job_id=job_id, device=device):
         nr = _make_nornir(device)
-        logger.info("Starting %s collection for %s", task_type, device.hostname)
+        logger.info("Starting %s collection for %s", task_type, device.display_name)
         _run_check(nr, device, job_id, task_type)

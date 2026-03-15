@@ -15,6 +15,7 @@ urlpatterns = [
     path("arp/", views.ArpEntryListView.as_view(), name="arp"),
     path("bgp-sessions/", views.BgpSessionListView.as_view(), name="bgp-sessions"),
     path("history/", views.history, name="history"),
+    path("diff/", views.diff, name="diff"),
     path("logs/", views.log_page, name="log-page"),
     path("tasks/", views.tasks, name="tasks"),
     path("poll-results/", views.poll_results, name="poll-results"),

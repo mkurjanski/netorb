@@ -45,7 +45,7 @@ tr:hover td { background: #161b22; }
   <select id="device-filter" onchange="applyFilter()">
     <option value="">— all —</option>
     {% for d in devices %}
-      <option value="{{ d }}" {% if selected_device == d %}selected{% endif %}>{{ d }}</option>
+      <option value="{{ d.ip_address }}" {% if selected_device == d.ip_address %}selected{% endif %}>{{ d.display_name }}</option>
     {% endfor %}
   </select>
 
@@ -74,7 +74,7 @@ tr:hover td { background: #161b22; }
       {% for r in results %}
       <tr>
         <td>{{ r.started_at|date:"Y-m-d H:i:s" }}</td>
-        <td>{{ r.device.hostname }}</td>
+        <td>{{ r.device.display_name }}</td>
         <td><span class="badge badge-{{ r.check_type }}">{{ r.get_check_type_display }}</span></td>
         <td>
           <span class="duration {% if r.duration_ms >= 10000 %}very-slow{% elif r.duration_ms >= 5000 %}slow{% endif %}">

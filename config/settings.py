@@ -99,4 +99,3 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Nornir device credentials (set via .env)
 NORNIR_USERNAME = config("NORNIR_USERNAME", default="admin")
 NORNIR_PASSWORD = config("NORNIR_PASSWORD", default="")
-

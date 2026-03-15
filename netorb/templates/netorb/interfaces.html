@@ -52,7 +52,7 @@ th.filter-row input:focus, th.filter-row select:focus {
             <select name="device" onchange="this.form.submit()">
               <option value="">— all —</option>
               {% for d in devices %}
-                <option value="{{ d }}" {% if f_device == d %}selected{% endif %}>{{ d }}</option>
+                <option value="{{ d.ip_address }}" {% if f_device == d.ip_address %}selected{% endif %}>{{ d.display_name }}</option>
               {% endfor %}
             </select>
           </th>
@@ -73,7 +73,7 @@ th.filter-row input:focus, th.filter-row select:focus {
       <tbody>
         {% for iface in interfaces %}
         <tr>
-          <td>{{ iface.device.hostname }}</td>
+          <td>{{ iface.device.display_name }}</td>
           <td>{{ iface.name }}</td>
           <td><span class="badge badge-{{ iface.oper_status }}">{{ iface.get_oper_status_display }}</span></td>
           <td style="color:#484f58">{{ iface.collected_at|date:"Y-m-d H:i:s" }}</td>

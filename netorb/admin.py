@@ -8,7 +8,7 @@ from .tasks import run_polling_task
 class TaskLogAdmin(admin.ModelAdmin):
     list_display = ("created_at", "job_id", "device", "level", "message")
     list_filter = ("level", "device")
-    search_fields = ("job_id", "message", "device__hostname")
+    search_fields = ("job_id", "message", "device__hostname", "device__ip_address")
     readonly_fields = ("job_id", "device", "level", "message", "created_at")
 
 
@@ -28,8 +28,8 @@ class IPv4RouteInline(admin.TabularInline):
 
 @admin.register(Device)
 class DeviceAdmin(admin.ModelAdmin):
-    list_display = ("hostname", "description", "created_at", "updated_at")
-    search_fields = ("hostname",)
+    list_display = ("ip_address", "hostname", "description", "created_at", "updated_at")
+    search_fields = ("ip_address", "hostname")
     inlines = [InterfaceInline, IPv4RouteInline]
 
 
@@ -37,21 +37,21 @@ class DeviceAdmin(admin.ModelAdmin):
 class InterfaceAdmin(admin.ModelAdmin):
     list_display = ("device", "name", "oper_status", "collected_at")
     list_filter = ("oper_status", "device")
-    search_fields = ("name", "device__hostname")
+    search_fields = ("name", "device__hostname", "device__ip_address")
 
 
 @admin.register(IPv4Route)
 class IPv4RouteAdmin(admin.ModelAdmin):
     list_display = ("device", "prefix", "collected_at")
     list_filter = ("device",)
-    search_fields = ("prefix", "device__hostname")
+    search_fields = ("prefix", "device__hostname", "device__ip_address")
 
 
 @admin.register(ArpEntry)
 class ArpEntryAdmin(admin.ModelAdmin):
     list_display = ("device", "ip_address", "mac_address", "interface", "age", "collected_at")
     list_filter = ("device", "interface")
-    search_fields = ("ip_address", "mac_address", "device__hostname")
+    search_fields = ("ip_address", "mac_address", "device__hostname", "device__ip_address")
     readonly_fields = ("device", "ip_address", "mac_address", "interface", "age", "collected_at")
 
 
@@ -59,7 +59,7 @@ class ArpEntryAdmin(admin.ModelAdmin):
 class BgpSessionAdmin(admin.ModelAdmin):
     list_display = ("device", "vrf", "peer_ip", "peer_asn", "peer_state", "prefixes_received", "prefixes_accepted", "collected_at")
     list_filter = ("peer_state", "device", "vrf")
-    search_fields = ("peer_ip", "device__hostname")
+    search_fields = ("peer_ip", "device__hostname", "device__ip_address")
     readonly_fields = ("device", "vrf", "peer_ip", "peer_asn", "peer_state", "prefixes_received", "prefixes_accepted", "updown_time", "collected_at")
 
 
@@ -67,7 +67,7 @@ class BgpSessionAdmin(admin.ModelAdmin):
 class PollResultAdmin(admin.ModelAdmin):
     list_display = ("started_at", "device", "check_type", "duration_ms", "success", "job_id")
     list_filter = ("success", "check_type", "device")
-    search_fields = ("job_id", "device__hostname")
+    search_fields = ("job_id", "device__hostname", "device__ip_address")
     readonly_fields = ("device", "job_id", "check_type", "started_at", "duration_ms", "success")
 
 

@@ -7,8 +7,14 @@ from netfields import CidrAddressField
 class Device(models.Model):
     hostname = models.CharField(
         max_length=255,
+        blank=True,
+        default="",
+        help_text="Human-readable hostname of the device (optional).",
+    )
+    ip_address = models.GenericIPAddressField(
+        protocol="IPv4",
         unique=True,
-        help_text="Hostname or IP address of the monitored device.",
+        help_text="IPv4 address used to connect to the device.",
     )
     description = models.CharField(
         max_length=255,
@@ -20,12 +26,17 @@ class Device(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["hostname"]
+        ordering = ["ip_address"]
         verbose_name = "Device"
         verbose_name_plural = "Devices"
 
+    @property
+    def display_name(self) -> str:
+        """Return hostname if set, otherwise the IP address."""
+        return self.hostname or self.ip_address
+
     def __str__(self):
-        return self.hostname
+        return self.display_name
 
 
 @pghistory.track(

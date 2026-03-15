@@ -70,7 +70,7 @@ tr:hover td { background: #161b22; }
     <tbody>
       {% for d in devices %}
       <tr>
-        <td>{{ d.hostname }}</td>
+        <td>{{ d.display_name }}</td>
         <td style="color:#8b949e">{{ d.description }}</td>
         <td>{{ d.interface_count }}</td>
         <td><span class="badge badge-up">{{ d.interfaces_up }}</span></td>
