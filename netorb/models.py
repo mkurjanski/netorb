@@ -283,7 +283,7 @@ class BgpSession(models.Model):
     pghistory.InsertEvent(),
     pghistory.UpdateEvent(),
     pghistory.DeleteEvent(),
-    exclude=["collected_at"],
+    exclude=["collected_at", "age"],
 )
 class ArpEntry(models.Model):
     device = models.ForeignKey(
