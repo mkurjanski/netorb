@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Interface, IPv4Route, NextHop
+from .models import Interface, IPv4Route
 
 
 class InterfaceSerializer(serializers.ModelSerializer):
@@ -11,15 +11,9 @@ class InterfaceSerializer(serializers.ModelSerializer):
         fields = ["id", "device", "name", "oper_status", "collected_at"]
 
 
-class NextHopSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = NextHop
-        fields = ["ip_address"]
-
-
 class IPv4RouteSerializer(serializers.ModelSerializer):
     device = serializers.StringRelatedField()
-    next_hops = NextHopSerializer(many=True, read_only=True)
+    next_hops = serializers.ListField(child=serializers.IPAddressField())
 
     class Meta:
         model = IPv4Route

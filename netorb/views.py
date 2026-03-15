@@ -11,10 +11,16 @@ from django.views.generic import ListView
 from rest_framework import filters
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
-from django.db.models import Count, Q
+from django.db.models import Count, Func, Q, TextField, Value
 
 from .models import ArpEntry, BgpSession, Device, Interface, IPv4Route, PollResult, TaskLog
 from .serializers import InterfaceSerializer, IPv4RouteSerializer
+
+def _filter_by_nexthop(qs, value):
+    """Filter routes where any next hop contains *value* (case-insensitive)."""
+    return qs.annotate(
+        _nh_str=Func("next_hops", Value(" "), function="array_to_string", output_field=TextField())
+    ).filter(_nh_str__icontains=value)
 
 class InterfaceViewSet(ReadOnlyModelViewSet):
     """
@@ -55,11 +61,7 @@ class IPv4RouteViewSet(ReadOnlyModelViewSet):
     search_fields = ["device__hostname"]
 
     def get_queryset(self):
-        qs = (
-            IPv4Route.objects.select_related("device")
-            .prefetch_related("next_hops")
-            .order_by("device__hostname", "prefix")
-        )
+        qs = IPv4Route.objects.select_related("device").order_by("device__hostname", "prefix")
         device = self.request.query_params.get("device")
         if device:
             qs = qs.filter(device__hostname=device)
@@ -102,11 +104,7 @@ class RouteListView(LoginRequiredMixin, ListView):
     paginate_by = 100
 
     def get_queryset(self):
-        qs = (
-            IPv4Route.objects.select_related("device")
-            .prefetch_related("next_hops")
-            .order_by("device__hostname", "prefix")
-        )
+        qs = IPv4Route.objects.select_related("device").order_by("device__hostname", "prefix")
         self.f_device = self.request.GET.get("device", "")
         self.f_prefix = self.request.GET.get("prefix", "")
         self.f_nexthop = self.request.GET.get("nexthop", "")
@@ -115,7 +113,7 @@ class RouteListView(LoginRequiredMixin, ListView):
         if self.f_prefix:
             qs = qs.filter(prefix__startswith=self.f_prefix)
         if self.f_nexthop:
-            qs = qs.filter(next_hops__ip_address__startswith=self.f_nexthop).distinct()
+            qs = _filter_by_nexthop(qs, self.f_nexthop)
         return qs
 
     def get_context_data(self, **kwargs):
@@ -154,8 +152,7 @@ def latest(request):
                     "status_choices": Interface.OperStatus.choices})
 
     elif tab == "routes":
-        qs = (IPv4Route.objects.select_related("device").prefetch_related("next_hops")
-              .order_by("device__hostname", "prefix"))
+        qs = IPv4Route.objects.select_related("device").order_by("device__hostname", "prefix")
         f_prefix = request.GET.get("prefix", "")
         f_nexthop = request.GET.get("nexthop", "")
         if f_device:
@@ -163,7 +160,7 @@ def latest(request):
         if f_prefix:
             qs = qs.filter(prefix__startswith=f_prefix)
         if f_nexthop:
-            qs = qs.filter(next_hops__ip_address__startswith=f_nexthop).distinct()
+            qs = _filter_by_nexthop(qs, f_nexthop)
         ctx.update({"objects": qs, "f_prefix": f_prefix, "f_nexthop": f_nexthop})
 
     elif tab == "arp":

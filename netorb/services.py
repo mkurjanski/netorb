@@ -3,9 +3,11 @@ Business logic for collecting network state from devices via Nornir.
 
 Collection flow:
   collect_device(device, task_type)
-    └─ _make_nornir()      → single-host Nornir instance
-    ├─ task_interfaces()   → SSH → 'show interfaces | json' → parse → upsert Interface rows
-    └─ task_routes()       → SSH → 'show ip route | json'  → parse → upsert IPv4Route + NextHop rows
+    └─ _make_nornir()        → single-host Nornir instance
+    ├─ task_interfaces()     → SSH → 'show interfaces | json'    → parse → upsert Interface rows
+    ├─ task_routes()         → SSH → 'show ip route | json'      → parse → upsert IPv4Route rows
+    ├─ task_bgp_sessions()   → SSH → 'show ip bgp summary | json'→ parse → upsert BgpSession rows
+    └─ task_arp()            → SSH → 'show ip arp | json'        → parse → upsert ArpEntry rows
 """
 
 import json
@@ -27,7 +29,7 @@ from nornir_netmiko.tasks import netmiko_send_command
 ConnectionPluginRegister.register("netmiko", NetmikoPlugin)
 
 from .log_handler import DBLogHandler
-from .models import ArpEntry, BgpSession, Device, Interface, IPv4Route, NextHop, PollResult
+from .models import ArpEntry, BgpSession, Device, Interface, IPv4Route, PollResult
 
 logger = logging.getLogger(__name__)
 
@@ -95,14 +97,17 @@ def task_routes(task, device: Device) -> None:
     route_data = json.loads(result[0].result)
     routes = route_data.get("vrfs", {}).get("default", {}).get("routes", {})
     for prefix, info in routes.items():
-        route, _ = IPv4Route.objects.update_or_create(device=device, prefix=prefix)
-        # Replace next hops on every sync to reflect current state.
-        route.next_hops.all().delete()
-        for via in info.get("vias", []):
-            nh = via.get("nexthopAddr")
-            # EOS uses the string "None" for directly connected routes.
-            if nh and nh != "None":
-                NextHop.objects.create(route=route, ip_address=nh)
+        # EOS uses the string "None" for directly connected routes.
+        next_hops = [
+            via["nexthopAddr"]
+            for via in info.get("vias", [])
+            if via.get("nexthopAddr") not in (None, "None")
+        ]
+        IPv4Route.objects.update_or_create(
+            device=device,
+            prefix=prefix,
+            defaults={"next_hops": next_hops},
+        )
 
 
 def task_bgp_sessions(task, device: Device) -> None:

@@ -1,5 +1,6 @@
-from netfields import CidrAddressField
+from django.contrib.postgres.fields import ArrayField
 from django.db import models
+from netfields import CidrAddressField
 
 
 class Device(models.Model):
@@ -76,6 +77,12 @@ class IPv4Route(models.Model):
     )
     prefix = CidrAddressField(
         help_text="Destination prefix in CIDR notation (e.g. 10.0.0.0/24).",
+    )
+    next_hops = ArrayField(
+        models.GenericIPAddressField(protocol="IPv4"),
+        default=list,
+        blank=True,
+        help_text="List of next-hop IPv4 addresses (empty for directly connected routes).",
     )
     collected_at = models.DateTimeField(
         auto_now=True,
@@ -324,27 +331,3 @@ class PollResult(models.Model):
         return f"{self.device.hostname} / {self.check_type} / {self.duration_ms}ms [{status}]"
 
 
-class NextHop(models.Model):
-    route = models.ForeignKey(
-        IPv4Route,
-        on_delete=models.CASCADE,
-        related_name="next_hops",
-        help_text="Route this next hop belongs to.",
-    )
-    ip_address = models.GenericIPAddressField(
-        protocol="IPv4",
-        help_text="Next hop IPv4 address.",
-    )
-
-    class Meta:
-        ordering = ["route", "ip_address"]
-        verbose_name = "Next Hop"
-        verbose_name_plural = "Next Hops"
-        constraints = [
-            models.UniqueConstraint(
-                fields=["route", "ip_address"], name="unique_route_nexthop"
-            )
-        ]
-
-    def __str__(self):
-        return f"{self.route} -> {self.ip_address}"

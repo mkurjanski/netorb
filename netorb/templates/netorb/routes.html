@@ -66,8 +66,8 @@ th.filter-row input:focus, th.filter-row select:focus {
           <td>{{ route.device.hostname }}</td>
           <td>{{ route.prefix }}</td>
           <td>
-            {% for nh in route.next_hops.all %}
-              <span class="next-hop">{{ nh.ip_address }}</span>
+            {% for nh in route.next_hops %}
+              <span class="next-hop">{{ nh }}</span>
             {% empty %}
               <span style="color:#484f58">directly connected</span>
             {% endfor %}
