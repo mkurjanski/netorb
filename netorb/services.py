@@ -81,10 +81,17 @@ def task_interfaces(task, device: Device) -> None:
             if attrs.get("lineProtocolStatus") == "up"
             else Interface.OperStatus.DOWN
         )
+        primary_ip = ""
+        iface_addrs = attrs.get("interfaceAddress", [])
+        if iface_addrs:
+            pip = iface_addrs[0].get("primaryIp", {})
+            addr = pip.get("address", "0.0.0.0")
+            if addr != "0.0.0.0":
+                primary_ip = f"{addr}/{pip.get('maskLen', 0)}"
         Interface.objects.update_or_create(
             device=device,
             name=name,
-            defaults={"oper_status": status},
+            defaults={"oper_status": status, "primary_ip": primary_ip},
         )
 
 

@@ -68,7 +68,7 @@ th.filter-row input:focus, th.filter-row select:focus { outline: none; border-co
   <main>
   <table>
     <thead>
-      <tr><th>Time</th><th>Event</th><th>Device</th><th>Interface</th><th>Status</th></tr>
+      <tr><th>Time</th><th>Event</th><th>Device</th><th>Interface</th><th>Primary IP</th><th>Status</th></tr>
       <tr>
         <th class="filter-row"></th>
         <th class="filter-row">
@@ -79,6 +79,7 @@ th.filter-row input:focus, th.filter-row select:focus { outline: none; border-co
         </th>
         <th class="filter-row"><select name="device" onchange="this.form.submit()"><option value="">— all —</option>{% for d in devices %}<option value="{{ d.ip_address }}" {% if f_device == d.ip_address %}selected{% endif %}>{{ d.display_name }}</option>{% endfor %}</select></th>
         <th class="filter-row"><input type="text" name="name" value="{{ f_name }}" placeholder="filter…"></th>
+        <th class="filter-row"></th>
         <th class="filter-row">
           <select name="status" onchange="this.form.submit()">
             <option value="">— all —</option>
@@ -94,9 +95,10 @@ th.filter-row input:focus, th.filter-row select:focus { outline: none; border-co
         <td><span class="badge badge-{{ e.pgh_label }}">{{ e.pgh_label }}</span></td>
         <td>{{ e.device.display_name }}</td>
         <td>{{ e.name }}</td>
+        <td>{% if e.primary_ip %}{{ e.primary_ip }}{% else %}<span style="color:#484f58">—</span>{% endif %}</td>
         <td><span class="badge badge-{{ e.oper_status }}">{{ e.oper_status }}</span></td>
       </tr>
-      {% empty %}<tr><td colspan="5" class="empty" style="padding:.75rem">No interface events found.</td></tr>{% endfor %}
+      {% empty %}<tr><td colspan="6" class="empty" style="padding:.75rem">No interface events found.</td></tr>{% endfor %}
     </tbody>
   </table>
   </main>

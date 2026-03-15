@@ -125,7 +125,7 @@ th.filter-row select:focus { outline: none; border-color: #58a6ff; }
 {% if tab == 'interfaces' %}
 <table>
   <thead>
-    <tr><th>Status</th><th>Device</th><th>Interface</th><th>T1 Status</th><th>T2 Status</th></tr>
+    <tr><th>Status</th><th>Device</th><th>Interface</th><th>Primary IP</th><th>T1 Status</th><th>T2 Status</th></tr>
   </thead>
   <tbody>
     {% for row in diff_rows %}
@@ -133,10 +133,11 @@ th.filter-row select:focus { outline: none; border-color: #58a6ff; }
       <td><span class="badge badge-{{ row.status }}">{{ row.status }}</span></td>
       <td>{% if row.t2 %}{{ row.t2.device.display_name }}{% else %}{{ row.t1.device.display_name }}{% endif %}</td>
       <td>{% if row.t2 %}{{ row.t2.name }}{% else %}{{ row.t1.name }}{% endif %}</td>
+      <td>{% if row.t2 %}{{ row.t2.primary_ip|default:"—" }}{% else %}{{ row.t1.primary_ip|default:"—" }}{% endif %}</td>
       <td>{% if row.t1 %}<span class="badge badge-{{ row.t1.oper_status }}">{{ row.t1.oper_status }}</span>{% else %}<span class="dash">—</span>{% endif %}</td>
       <td>{% if row.t2 %}<span class="badge badge-{{ row.t2.oper_status }}">{{ row.t2.oper_status }}</span>{% else %}<span class="dash">—</span>{% endif %}</td>
     </tr>
-    {% empty %}<tr><td colspan="5"><span class="empty">No interface changes between these timestamps.</span></td></tr>{% endfor %}
+    {% empty %}<tr><td colspan="6"><span class="empty">No interface changes between these timestamps.</span></td></tr>{% endfor %}
   </tbody>
 </table>
 

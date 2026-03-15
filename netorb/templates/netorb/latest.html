@@ -64,10 +64,11 @@ th.filter-row input:focus, th.filter-row select:focus { outline: none; border-co
   <main>
   <table>
     <thead>
-      <tr><th>Device</th><th>Interface</th><th>Status</th><th>Collected</th></tr>
+      <tr><th>Device</th><th>Interface</th><th>Primary IP</th><th>Status</th><th>Collected</th></tr>
       <tr>
         <th class="filter-row"><select name="device" onchange="this.form.submit()"><option value="">— all —</option>{% for d in devices %}<option value="{{ d.ip_address }}" {% if f_device == d.ip_address %}selected{% endif %}>{{ d.display_name }}</option>{% endfor %}</select></th>
         <th class="filter-row"><input type="text" name="name" value="{{ f_name }}" placeholder="filter…"></th>
+        <th class="filter-row"></th>
         <th class="filter-row">
           <select name="status" onchange="this.form.submit()">
             <option value="">— all —</option>
@@ -82,10 +83,11 @@ th.filter-row input:focus, th.filter-row select:focus { outline: none; border-co
       <tr>
         <td>{{ iface.device.display_name }}</td>
         <td>{{ iface.name }}</td>
+        <td>{% if iface.primary_ip %}{{ iface.primary_ip }}{% else %}<span style="color:#484f58">—</span>{% endif %}</td>
         <td><span class="badge badge-{{ iface.oper_status }}">{{ iface.get_oper_status_display }}</span></td>
         <td style="color:#484f58">{{ iface.collected_at|date:"Y-m-d H:i:s" }}</td>
       </tr>
-      {% empty %}<tr><td colspan="4" class="empty" style="padding:.75rem">No interfaces found.</td></tr>{% endfor %}
+      {% empty %}<tr><td colspan="5" class="empty" style="padding:.75rem">No interfaces found.</td></tr>{% endfor %}
     </tbody>
   </table>
   </main>

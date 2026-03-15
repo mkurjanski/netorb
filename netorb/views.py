@@ -458,7 +458,7 @@ def diff(request):
         InterfaceEvent = apps.get_model("netorb", "InterfaceEvent")
         s1 = _snapshot_at(InterfaceEvent, t1)
         s2 = _snapshot_at(InterfaceEvent, t2)
-        rows = _build_diff(s1, s2, lambda a, b: a.oper_status != b.oper_status)
+        rows = _build_diff(s1, s2, lambda a, b: a.oper_status != b.oper_status or a.primary_ip != b.primary_ip)
         if f_device:
             rows = _filter_diff_by_device(rows, f_device)
         ctx["diff_rows"] = _sort_diff(rows, "name")

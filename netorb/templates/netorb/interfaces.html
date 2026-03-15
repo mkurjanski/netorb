@@ -44,6 +44,7 @@ th.filter-row input:focus, th.filter-row select:focus {
         <tr>
           <th>Device</th>
           <th>Interface</th>
+          <th>Primary IP</th>
           <th>Status</th>
           <th>Collected</th>
         </tr>
@@ -59,6 +60,7 @@ th.filter-row input:focus, th.filter-row select:focus {
           <th class="filter-row">
             <input type="text" name="name" value="{{ f_name }}" placeholder="filter…">
           </th>
+          <th class="filter-row"></th>
           <th class="filter-row">
             <select name="status" onchange="this.form.submit()">
               <option value="">— all —</option>
@@ -75,11 +77,12 @@ th.filter-row input:focus, th.filter-row select:focus {
         <tr>
           <td>{{ iface.device.display_name }}</td>
           <td>{{ iface.name }}</td>
+          <td>{% if iface.primary_ip %}{{ iface.primary_ip }}{% else %}<span style="color:#484f58">—</span>{% endif %}</td>
           <td><span class="badge badge-{{ iface.oper_status }}">{{ iface.get_oper_status_display }}</span></td>
           <td style="color:#484f58">{{ iface.collected_at|date:"Y-m-d H:i:s" }}</td>
         </tr>
         {% empty %}
-        <tr><td colspan="4" class="empty" style="padding:.75rem">No interfaces match the current filters.</td></tr>
+        <tr><td colspan="5" class="empty" style="padding:.75rem">No interfaces match the current filters.</td></tr>
         {% endfor %}
       </tbody>
     </table>

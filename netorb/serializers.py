@@ -8,7 +8,7 @@ class InterfaceSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Interface
-        fields = ["id", "device", "name", "oper_status", "collected_at"]
+        fields = ["id", "device", "name", "oper_status", "primary_ip", "collected_at"]
 
 
 class IPv4RouteSerializer(serializers.ModelSerializer):

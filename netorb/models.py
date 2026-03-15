@@ -67,6 +67,12 @@ class Interface(models.Model):
         default=OperStatus.UNKNOWN,
         help_text="Operational status of the interface.",
     )
+    primary_ip = models.CharField(
+        max_length=43,
+        blank=True,
+        default="",
+        help_text="Primary IPv4 address in CIDR notation (e.g. 10.0.0.1/24).",
+    )
     collected_at = models.DateTimeField(
         auto_now=True,
         help_text="Timestamp of the last data collection.",

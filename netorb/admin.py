@@ -15,7 +15,7 @@ class TaskLogAdmin(admin.ModelAdmin):
 class InterfaceInline(admin.TabularInline):
     model = Interface
     extra = 0
-    fields = ("name", "oper_status", "collected_at")
+    fields = ("name", "oper_status", "primary_ip", "collected_at")
     readonly_fields = ("collected_at",)
 
 
@@ -35,9 +35,9 @@ class DeviceAdmin(admin.ModelAdmin):
 
 @admin.register(Interface)
 class InterfaceAdmin(admin.ModelAdmin):
-    list_display = ("device", "name", "oper_status", "collected_at")
+    list_display = ("device", "name", "oper_status", "primary_ip", "collected_at")
     list_filter = ("oper_status", "device")
-    search_fields = ("name", "device__hostname", "device__ip_address")
+    search_fields = ("name", "primary_ip", "device__hostname", "device__ip_address")
 
 
 @admin.register(IPv4Route)
