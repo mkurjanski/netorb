@@ -26,7 +26,7 @@ from nornir_netmiko.tasks import netmiko_send_command
 ConnectionPluginRegister.register("netmiko", NetmikoPlugin)
 
 from .log_handler import DBLogHandler
-from .models import Device, Interface, IPv4Route, NextHop, PollResult
+from .models import BgpSession, Device, Interface, IPv4Route, NextHop, PollResult
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +104,30 @@ def task_routes(task, device: Device) -> None:
                 NextHop.objects.create(route=route, ip_address=nh)
 
 
+def task_bgp_sessions(task, device: Device) -> None:
+    """Nornir parent task: collect BGP session state and sync to DB."""
+    result = task.run(
+        task=netmiko_send_command,
+        command_string="show ip bgp summary | json",
+    )
+    data = json.loads(result[0].result)
+    for vrf_name, vrf_data in data.get("vrfs", {}).items():
+        for peer_ip, peer in vrf_data.get("peers", {}).items():
+            updown_time = peer.get("upDownTime")
+            BgpSession.objects.update_or_create(
+                device=device,
+                vrf=vrf_name,
+                peer_ip=peer_ip,
+                defaults={
+                    "peer_asn": peer.get("asn", 0),
+                    "peer_state": peer.get("peerState", BgpSession.PeerState.UNKNOWN),
+                    "prefixes_received": peer.get("prefixReceived", 0),
+                    "prefixes_accepted": peer.get("prefixAccepted", 0),
+                    "updown_time": timezone.datetime.fromtimestamp(updown_time, tz=timezone.utc) if updown_time else None,
+                },
+            )
+
+
 # ---------------------------------------------------------------------------
 # Task dispatch
 # ---------------------------------------------------------------------------
@@ -111,6 +135,7 @@ def task_routes(task, device: Device) -> None:
 _TASK_MAP = {
     PollResult.CheckType.INTERFACES: task_interfaces,
     PollResult.CheckType.ROUTES: task_routes,
+    PollResult.CheckType.BGP_SESSIONS: task_bgp_sessions,
 }
 
 

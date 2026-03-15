@@ -137,6 +137,7 @@ class PollingTask(models.Model):
     class TaskType(models.TextChoices):
         INTERFACES = "interfaces", "Interfaces"
         ROUTES = "routes", "Routes"
+        BGP_SESSIONS = "bgp_sessions", "BGP Sessions"
 
     name = models.CharField(
         max_length=100,
@@ -169,10 +170,78 @@ class PollingTask(models.Model):
         return self.name
 
 
+class BgpSession(models.Model):
+    class PeerState(models.TextChoices):
+        ESTABLISHED = "Established", "Established"
+        ACTIVE = "Active", "Active"
+        IDLE = "Idle", "Idle"
+        CONNECT = "Connect", "Connect"
+        OPENSENT = "OpenSent", "OpenSent"
+        OPENCONFIRM = "OpenConfirm", "OpenConfirm"
+        UNKNOWN = "Unknown", "Unknown"
+
+    device = models.ForeignKey(
+        Device,
+        on_delete=models.CASCADE,
+        related_name="bgp_sessions",
+        help_text="Device this BGP session was collected from.",
+    )
+    vrf = models.CharField(
+        max_length=64,
+        default="default",
+        help_text="VRF this session belongs to.",
+    )
+    peer_ip = models.GenericIPAddressField(
+        protocol="IPv4",
+        help_text="BGP peer IP address.",
+    )
+    peer_asn = models.PositiveIntegerField(
+        help_text="BGP peer AS number.",
+    )
+    peer_state = models.CharField(
+        max_length=16,
+        choices=PeerState.choices,
+        default=PeerState.UNKNOWN,
+        help_text="Current BGP session state.",
+    )
+    prefixes_received = models.PositiveIntegerField(
+        default=0,
+        help_text="Number of prefixes received from this peer.",
+    )
+    prefixes_accepted = models.PositiveIntegerField(
+        default=0,
+        help_text="Number of prefixes accepted from this peer.",
+    )
+    updown_time = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the session last changed state.",
+    )
+    collected_at = models.DateTimeField(
+        auto_now=True,
+        help_text="Timestamp of the last data collection.",
+    )
+
+    class Meta:
+        ordering = ["device", "vrf", "peer_ip"]
+        verbose_name = "BGP Session"
+        verbose_name_plural = "BGP Sessions"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["device", "vrf", "peer_ip"],
+                name="unique_device_vrf_peer",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.device.hostname} / {self.vrf} / {self.peer_ip} ({self.peer_state})"
+
+
 class PollResult(models.Model):
     class CheckType(models.TextChoices):
         INTERFACES = "interfaces", "Interfaces"
         ROUTES = "routes", "Routes"
+        BGP_SESSIONS = "bgp_sessions", "BGP Sessions"
 
     device = models.ForeignKey(
         Device,

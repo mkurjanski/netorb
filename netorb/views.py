@@ -13,7 +13,7 @@ from rest_framework.viewsets import ReadOnlyModelViewSet
 
 from django.db.models import Count, Q
 
-from .models import Device, Interface, IPv4Route, PollResult, TaskLog
+from .models import BgpSession, Device, Interface, IPv4Route, PollResult, TaskLog
 from .serializers import InterfaceSerializer, IPv4RouteSerializer
 
 class InterfaceViewSet(ReadOnlyModelViewSet):
@@ -124,6 +124,43 @@ class RouteListView(LoginRequiredMixin, ListView):
         ctx["f_device"] = self.f_device
         ctx["f_prefix"] = self.f_prefix
         ctx["f_nexthop"] = self.f_nexthop
+        return ctx
+
+
+class BgpSessionListView(LoginRequiredMixin, ListView):
+    model = BgpSession
+    template_name = "netorb/bgp_sessions.html"
+    context_object_name = "sessions"
+    paginate_by = 100
+
+    def get_queryset(self):
+        qs = BgpSession.objects.select_related("device").order_by("device__hostname", "vrf", "peer_ip")
+        self.f_device = self.request.GET.get("device", "")
+        self.f_vrf = self.request.GET.get("vrf", "")
+        self.f_peer_ip = self.request.GET.get("peer_ip", "")
+        self.f_peer_asn = self.request.GET.get("peer_asn", "")
+        self.f_state = self.request.GET.get("state", "")
+        if self.f_device:
+            qs = qs.filter(device__hostname=self.f_device)
+        if self.f_vrf:
+            qs = qs.filter(vrf__icontains=self.f_vrf)
+        if self.f_peer_ip:
+            qs = qs.filter(peer_ip__startswith=self.f_peer_ip)
+        if self.f_peer_asn:
+            qs = qs.filter(peer_asn=self.f_peer_asn)
+        if self.f_state:
+            qs = qs.filter(peer_state=self.f_state)
+        return qs
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["devices"] = Device.objects.values_list("hostname", flat=True).order_by("hostname")
+        ctx["state_choices"] = BgpSession.PeerState.choices
+        ctx["f_device"] = self.f_device
+        ctx["f_vrf"] = self.f_vrf
+        ctx["f_peer_ip"] = self.f_peer_ip
+        ctx["f_peer_asn"] = self.f_peer_asn
+        ctx["f_state"] = self.f_state
         return ctx
 
 
