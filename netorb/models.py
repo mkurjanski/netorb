@@ -1,3 +1,4 @@
+import pghistory
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from netfields import CidrAddressField
@@ -27,6 +28,12 @@ class Device(models.Model):
         return self.hostname
 
 
+@pghistory.track(
+    pghistory.InsertEvent(),
+    pghistory.UpdateEvent(),
+    pghistory.DeleteEvent(),
+    exclude=["collected_at"],
+)
 class Interface(models.Model):
     class OperStatus(models.TextChoices):
         UP = "up", "Up"
@@ -68,6 +75,12 @@ class Interface(models.Model):
         return f"{self.device.hostname} / {self.name}"
 
 
+@pghistory.track(
+    pghistory.InsertEvent(),
+    pghistory.UpdateEvent(),
+    pghistory.DeleteEvent(),
+    exclude=["collected_at"],
+)
 class IPv4Route(models.Model):
     device = models.ForeignKey(
         Device,
@@ -178,6 +191,12 @@ class PollingTask(models.Model):
         return self.name
 
 
+@pghistory.track(
+    pghistory.InsertEvent(),
+    pghistory.UpdateEvent(),
+    pghistory.DeleteEvent(),
+    exclude=["collected_at"],
+)
 class BgpSession(models.Model):
     class PeerState(models.TextChoices):
         ESTABLISHED = "Established", "Established"
@@ -245,6 +264,12 @@ class BgpSession(models.Model):
         return f"{self.device.hostname} / {self.vrf} / {self.peer_ip} ({self.peer_state})"
 
 
+@pghistory.track(
+    pghistory.InsertEvent(),
+    pghistory.UpdateEvent(),
+    pghistory.DeleteEvent(),
+    exclude=["collected_at"],
+)
 class ArpEntry(models.Model):
     device = models.ForeignKey(
         Device,

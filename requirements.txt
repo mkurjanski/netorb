@@ -8,3 +8,5 @@ pytest>=8.0
 nornir>=3.4
 nornir-netmiko>=1.0
 nornir-utils>=0.2
+django-pghistory>=3.9
+django-pgtrigger>=4.17

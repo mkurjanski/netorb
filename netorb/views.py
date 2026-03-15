@@ -11,6 +11,7 @@ from django.views.generic import ListView
 from rest_framework import filters
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
+from django.apps import apps
 from django.db.models import Count, Func, Q, TextField, Value
 
 from .models import ArpEntry, BgpSession, Device, Interface, IPv4Route, PollResult, TaskLog
@@ -268,6 +269,97 @@ class BgpSessionListView(LoginRequiredMixin, ListView):
         ctx["f_peer_asn"] = self.f_peer_asn
         ctx["f_state"] = self.f_state
         return ctx
+
+
+_HISTORY_TABS = ["interfaces", "routes", "arp", "bgp_sessions"]
+_EVENT_LABELS = [("insert", "Insert"), ("update", "Update"), ("delete", "Delete")]
+
+
+@login_required
+def history(request):
+    tab = request.GET.get("tab", "interfaces")
+    if tab not in _HISTORY_TABS:
+        tab = "interfaces"
+
+    devices = Device.objects.values_list("hostname", flat=True).order_by("hostname")
+    f_device = request.GET.get("device", "")
+    f_event = request.GET.get("event", "")
+    ctx = {
+        "tab": tab,
+        "devices": devices,
+        "f_device": f_device,
+        "f_event": f_event,
+        "event_labels": _EVENT_LABELS,
+    }
+
+    if tab == "interfaces":
+        InterfaceEvent = apps.get_model("netorb", "InterfaceEvent")
+        qs = InterfaceEvent.objects.select_related("device").order_by("-pgh_created_at")
+        f_name = request.GET.get("name", "")
+        f_status = request.GET.get("status", "")
+        if f_device:
+            qs = qs.filter(device__hostname=f_device)
+        if f_event:
+            qs = qs.filter(pgh_label=f_event)
+        if f_name:
+            qs = qs.filter(name__icontains=f_name)
+        if f_status:
+            qs = qs.filter(oper_status=f_status)
+        ctx.update({
+            "objects": qs[:500],
+            "f_name": f_name,
+            "f_status": f_status,
+            "status_choices": Interface.OperStatus.choices,
+        })
+
+    elif tab == "routes":
+        IPv4RouteEvent = apps.get_model("netorb", "IPv4RouteEvent")
+        qs = IPv4RouteEvent.objects.select_related("device").order_by("-pgh_created_at")
+        f_prefix = request.GET.get("prefix", "")
+        if f_device:
+            qs = qs.filter(device__hostname=f_device)
+        if f_event:
+            qs = qs.filter(pgh_label=f_event)
+        if f_prefix:
+            qs = qs.filter(prefix__startswith=f_prefix)
+        ctx.update({"objects": qs[:500], "f_prefix": f_prefix})
+
+    elif tab == "arp":
+        ArpEntryEvent = apps.get_model("netorb", "ArpEntryEvent")
+        qs = ArpEntryEvent.objects.select_related("device").order_by("-pgh_created_at")
+        f_ip = request.GET.get("ip", "")
+        f_mac = request.GET.get("mac", "")
+        if f_device:
+            qs = qs.filter(device__hostname=f_device)
+        if f_event:
+            qs = qs.filter(pgh_label=f_event)
+        if f_ip:
+            qs = qs.filter(ip_address__startswith=f_ip)
+        if f_mac:
+            qs = qs.filter(mac_address__icontains=f_mac)
+        ctx.update({"objects": qs[:500], "f_ip": f_ip, "f_mac": f_mac})
+
+    elif tab == "bgp_sessions":
+        BgpSessionEvent = apps.get_model("netorb", "BgpSessionEvent")
+        qs = BgpSessionEvent.objects.select_related("device").order_by("-pgh_created_at")
+        f_peer_ip = request.GET.get("peer_ip", "")
+        f_state = request.GET.get("state", "")
+        if f_device:
+            qs = qs.filter(device__hostname=f_device)
+        if f_event:
+            qs = qs.filter(pgh_label=f_event)
+        if f_peer_ip:
+            qs = qs.filter(peer_ip__startswith=f_peer_ip)
+        if f_state:
+            qs = qs.filter(peer_state=f_state)
+        ctx.update({
+            "objects": qs[:500],
+            "f_peer_ip": f_peer_ip,
+            "f_state": f_state,
+            "state_choices": BgpSession.PeerState.choices,
+        })
+
+    return render(request, "netorb/history.html", ctx)
 
 
 _SSE_TIMEOUT_SECONDS = 120
