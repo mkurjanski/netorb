@@ -15,17 +15,6 @@
 .tabs a:hover { color: #c9d1d9; }
 .tabs a.active { color: #c9d1d9; border-bottom-color: #58a6ff; }
 
-.controls {
-  display: flex; align-items: center; gap: .75rem;
-  padding: .5rem 1.25rem; background: #0d1117; border-bottom: 1px solid #30363d;
-}
-.controls label { color: #8b949e; }
-.controls select {
-  background: #161b22; color: #c9d1d9;
-  border: 1px solid #30363d; border-radius: 4px;
-  padding: .2rem .5rem; font-family: monospace; font-size: 13px;
-}
-
 table { width: 100%; border-collapse: collapse; }
 th {
   text-align: left; padding: .4rem .75rem;
@@ -72,19 +61,12 @@ th.filter-row input:focus, th.filter-row select:focus { outline: none; border-co
   <input type="hidden" name="tab" value="{{ tab }}">
 
   {% if tab == 'interfaces' %}
-  <div class="controls">
-    <label>Device:</label>
-    <select name="device" onchange="this.form.submit()">
-      <option value="">— all —</option>
-      {% for d in devices %}<option value="{{ d }}" {% if f_device == d %}selected{% endif %}>{{ d }}</option>{% endfor %}
-    </select>
-  </div>
   <main>
   <table>
     <thead>
       <tr><th>Device</th><th>Interface</th><th>Status</th><th>Collected</th></tr>
       <tr>
-        <th class="filter-row"></th>
+        <th class="filter-row"><select name="device" onchange="this.form.submit()"><option value="">— all —</option>{% for d in devices %}<option value="{{ d }}" {% if f_device == d %}selected{% endif %}>{{ d }}</option>{% endfor %}</select></th>
         <th class="filter-row"><input type="text" name="name" value="{{ f_name }}" placeholder="filter…"></th>
         <th class="filter-row">
           <select name="status" onchange="this.form.submit()">
@@ -109,19 +91,12 @@ th.filter-row input:focus, th.filter-row select:focus { outline: none; border-co
   </main>
 
   {% elif tab == 'routes' %}
-  <div class="controls">
-    <label>Device:</label>
-    <select name="device" onchange="this.form.submit()">
-      <option value="">— all —</option>
-      {% for d in devices %}<option value="{{ d }}" {% if f_device == d %}selected{% endif %}>{{ d }}</option>{% endfor %}
-    </select>
-  </div>
   <main>
   <table>
     <thead>
       <tr><th>Device</th><th>Prefix</th><th>Next Hops</th><th>Collected</th></tr>
       <tr>
-        <th class="filter-row"></th>
+        <th class="filter-row"><select name="device" onchange="this.form.submit()"><option value="">— all —</option>{% for d in devices %}<option value="{{ d }}" {% if f_device == d %}selected{% endif %}>{{ d }}</option>{% endfor %}</select></th>
         <th class="filter-row"><input type="text" name="prefix" value="{{ f_prefix }}" placeholder="filter…"></th>
         <th class="filter-row"><input type="text" name="nexthop" value="{{ f_nexthop }}" placeholder="filter…"></th>
         <th class="filter-row"></th>
@@ -144,19 +119,12 @@ th.filter-row input:focus, th.filter-row select:focus { outline: none; border-co
   </main>
 
   {% elif tab == 'arp' %}
-  <div class="controls">
-    <label>Device:</label>
-    <select name="device" onchange="this.form.submit()">
-      <option value="">— all —</option>
-      {% for d in devices %}<option value="{{ d }}" {% if f_device == d %}selected{% endif %}>{{ d }}</option>{% endfor %}
-    </select>
-  </div>
   <main>
   <table>
     <thead>
       <tr><th>Device</th><th>IP Address</th><th>MAC Address</th><th>Interface</th><th>Age (s)</th><th>Collected</th></tr>
       <tr>
-        <th class="filter-row"></th>
+        <th class="filter-row"><select name="device" onchange="this.form.submit()"><option value="">— all —</option>{% for d in devices %}<option value="{{ d }}" {% if f_device == d %}selected{% endif %}>{{ d }}</option>{% endfor %}</select></th>
         <th class="filter-row"><input type="text" name="ip" value="{{ f_ip }}" placeholder="filter…"></th>
         <th class="filter-row"><input type="text" name="mac" value="{{ f_mac }}" placeholder="filter…"></th>
         <th class="filter-row"><input type="text" name="interface" value="{{ f_interface }}" placeholder="filter…"></th>
@@ -180,19 +148,12 @@ th.filter-row input:focus, th.filter-row select:focus { outline: none; border-co
   </main>
 
   {% elif tab == 'bgp_sessions' %}
-  <div class="controls">
-    <label>Device:</label>
-    <select name="device" onchange="this.form.submit()">
-      <option value="">— all —</option>
-      {% for d in devices %}<option value="{{ d }}" {% if f_device == d %}selected{% endif %}>{{ d }}</option>{% endfor %}
-    </select>
-  </div>
   <main>
   <table>
     <thead>
       <tr><th>Device</th><th>VRF</th><th>Peer IP</th><th>Peer ASN</th><th>State</th><th>Pfx Rcvd</th><th>Pfx Acc</th><th>Up/Down Since</th><th>Collected</th></tr>
       <tr>
-        <th class="filter-row"></th>
+        <th class="filter-row"><select name="device" onchange="this.form.submit()"><option value="">— all —</option>{% for d in devices %}<option value="{{ d }}" {% if f_device == d %}selected{% endif %}>{{ d }}</option>{% endfor %}</select></th>
         <th class="filter-row"><input type="text" name="vrf" value="{{ f_vrf }}" placeholder="filter…"></th>
         <th class="filter-row"><input type="text" name="peer_ip" value="{{ f_peer_ip }}" placeholder="filter…"></th>
         <th class="filter-row"><input type="text" name="peer_asn" value="{{ f_peer_asn }}" placeholder="filter…"></th>
