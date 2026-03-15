@@ -278,14 +278,13 @@ _SSE_POLL_INTERVAL = 1
 def home(request):
     devices = Device.objects.annotate(
         interface_count=Count("interfaces", distinct=True),
-        interfaces_up=Count("interfaces", filter=Q(interfaces__oper_status="UP"), distinct=True),
+        interfaces_up=Count("interfaces", filter=Q(interfaces__oper_status="up"), distinct=True),
         route_count=Count("ipv4_routes", distinct=True),
     ).order_by("hostname")
 
     context = {
         "device_count": Device.objects.count(),
         "interface_count": Interface.objects.count(),
-        "interfaces_up": Interface.objects.filter(oper_status="UP").count(),
         "route_count": IPv4Route.objects.count(),
         "devices": devices,
     }
