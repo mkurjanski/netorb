@@ -519,6 +519,7 @@ def diff(request):
             or a.peer_asn != b.peer_asn
             or a.prefixes_received != b.prefixes_received
             or a.prefixes_accepted != b.prefixes_accepted
+            or a.time_of_last_change != b.time_of_last_change
         ))
         if f_device:
             rows = _filter_diff_by_device(rows, f_device)
@@ -555,6 +556,9 @@ def home(request):
         "device_count": Device.objects.count(),
         "interface_count": Interface.objects.count(),
         "route_count": IPv4Route.objects.count(),
+        "bgp_session_count": BgpSession.objects.count(),
+        "arp_count": ArpEntry.objects.count(),
+        "lldp_count": LldpNeighbor.objects.count(),
         "devices": devices,
     }
     return render(request, "netorb/home.html", context)

@@ -38,7 +38,6 @@ th.filter-row input:focus, th.filter-row select:focus {
           <th>IP Address</th>
           <th>MAC Address</th>
           <th>Interface</th>
-          <th>Age (s)</th>
           <th>Collected</th>
         </tr>
         <tr>
@@ -60,7 +59,6 @@ th.filter-row input:focus, th.filter-row select:focus {
             <input type="text" name="interface" value="{{ f_interface }}" placeholder="filter…">
           </th>
           <th class="filter-row"></th>
-          <th class="filter-row"></th>
         </tr>
       </thead>
       <tbody>
@@ -70,11 +68,10 @@ th.filter-row input:focus, th.filter-row select:focus {
           <td>{{ e.ip_address }}</td>
           <td style="color:#d2a8ff">{{ e.mac_address }}</td>
           <td>{{ e.interface }}</td>
-          <td style="color:#8b949e">{{ e.age }}</td>
           <td style="color:#484f58">{{ e.collected_at|date:"Y-m-d H:i:s" }}</td>
         </tr>
         {% empty %}
-        <tr><td colspan="6" class="empty" style="padding:.75rem">No ARP entries match the current filters.</td></tr>
+        <tr><td colspan="5" class="empty" style="padding:.75rem">No ARP entries match the current filters.</td></tr>
         {% endfor %}
       </tbody>
     </table>

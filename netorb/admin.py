@@ -49,10 +49,10 @@ class IPv4RouteAdmin(admin.ModelAdmin):
 
 @admin.register(ArpEntry)
 class ArpEntryAdmin(admin.ModelAdmin):
-    list_display = ("device", "ip_address", "mac_address", "interface", "age", "collected_at")
+    list_display = ("device", "ip_address", "mac_address", "interface", "collected_at")
     list_filter = ("device", "interface")
     search_fields = ("ip_address", "mac_address", "device__hostname", "device__ip_address")
-    readonly_fields = ("device", "ip_address", "mac_address", "interface", "age", "collected_at")
+    readonly_fields = ("device", "ip_address", "mac_address", "interface", "collected_at")
 
 
 @admin.register(BgpSession)
@@ -60,7 +60,7 @@ class BgpSessionAdmin(admin.ModelAdmin):
     list_display = ("device", "vrf", "peer_ip", "peer_asn", "peer_state", "prefixes_received", "prefixes_accepted", "collected_at")
     list_filter = ("peer_state", "device", "vrf")
     search_fields = ("peer_ip", "device__hostname", "device__ip_address")
-    readonly_fields = ("device", "vrf", "peer_ip", "peer_asn", "peer_state", "prefixes_received", "prefixes_accepted", "updown_time", "collected_at")
+    readonly_fields = ("device", "vrf", "peer_ip", "peer_asn", "peer_state", "prefixes_received", "prefixes_accepted", "time_of_last_change", "collected_at")
 
 
 @admin.register(LldpNeighbor)

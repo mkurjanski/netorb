@@ -255,10 +255,10 @@ class BgpSession(models.Model):
         default=0,
         help_text="Number of prefixes accepted from this peer.",
     )
-    updown_time = models.DateTimeField(
+    time_of_last_change = models.DateTimeField(
         null=True,
         blank=True,
-        help_text="When the session last changed state.",
+        help_text="When the session last changed state, calculated from device-reported uptime.",
     )
     collected_at = models.DateTimeField(
         auto_now=True,
@@ -284,7 +284,7 @@ class BgpSession(models.Model):
     pghistory.InsertEvent(),
     pghistory.UpdateEvent(),
     pghistory.DeleteEvent(),
-    exclude=["collected_at", "age"],
+    exclude=["collected_at"],
 )
 class ArpEntry(models.Model):
     device = models.ForeignKey(
@@ -304,9 +304,6 @@ class ArpEntry(models.Model):
     interface = models.CharField(
         max_length=64,
         help_text="Interface the ARP entry was learned on.",
-    )
-    age = models.PositiveIntegerField(
-        help_text="Age of the ARP entry in seconds.",
     )
     collected_at = models.DateTimeField(
         auto_now=True,

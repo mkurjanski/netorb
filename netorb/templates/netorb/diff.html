@@ -186,7 +186,7 @@ th.filter-row select:focus { outline: none; border-color: #58a6ff; }
 {% elif tab == 'bgp_sessions' %}
 <table>
   <thead>
-    <tr><th>Status</th><th>Device</th><th>VRF</th><th>Peer IP</th><th>Peer ASN</th><th>State</th><th>Pfx Rcvd</th></tr>
+    <tr><th>Status</th><th>Device</th><th>VRF</th><th>Peer IP</th><th>Peer ASN</th><th>State</th><th>Pfx Rcvd</th><th>Pfx Acc</th><th>Last Change</th></tr>
   </thead>
   <tbody>
     {% for row in diff_rows %}
@@ -202,14 +202,20 @@ th.filter-row select:focus { outline: none; border-color: #58a6ff; }
       <td>{% if row.status == 'added' %}{{ row.t2.prefixes_received }}
         {% elif row.status == 'removed' %}{{ row.t1.prefixes_received }}
         {% else %}{% if row.t1.prefixes_received != row.t2.prefixes_received %}{{ row.t1.prefixes_received }} <span class="hl">›</span> {{ row.t2.prefixes_received }}{% else %}{{ row.t2.prefixes_received }}{% endif %}{% endif %}</td>
+      <td>{% if row.status == 'added' %}{{ row.t2.prefixes_accepted }}
+        {% elif row.status == 'removed' %}{{ row.t1.prefixes_accepted }}
+        {% else %}{% if row.t1.prefixes_accepted != row.t2.prefixes_accepted %}{{ row.t1.prefixes_accepted }} <span class="hl">›</span> {{ row.t2.prefixes_accepted }}{% else %}{{ row.t2.prefixes_accepted }}{% endif %}{% endif %}</td>
+      <td style="color:#484f58">{% if row.status == 'added' %}{% if row.t2.time_of_last_change %}{{ row.t2.time_of_last_change|date:"Y-m-d H:i:s" }}{% else %}—{% endif %}
+        {% elif row.status == 'removed' %}{% if row.t1.time_of_last_change %}{{ row.t1.time_of_last_change|date:"Y-m-d H:i:s" }}{% else %}—{% endif %}
+        {% else %}{% if row.t1.time_of_last_change != row.t2.time_of_last_change %}{% if row.t1.time_of_last_change %}{{ row.t1.time_of_last_change|date:"Y-m-d H:i:s" }}{% else %}—{% endif %} <span class="hl">›</span> {% if row.t2.time_of_last_change %}{{ row.t2.time_of_last_change|date:"Y-m-d H:i:s" }}{% else %}—{% endif %}{% else %}{% if row.t2.time_of_last_change %}{{ row.t2.time_of_last_change|date:"Y-m-d H:i:s" }}{% else %}—{% endif %}{% endif %}{% endif %}</td>
     </tr>
-    {% empty %}<tr><td colspan="7"><span class="empty">No BGP session changes between these timestamps.</span></td></tr>{% endfor %}
+    {% empty %}<tr><td colspan="9"><span class="empty">No BGP session changes between these timestamps.</span></td></tr>{% endfor %}
   </tbody>
 </table>
 {% elif tab == 'lldp' %}
 <table>
   <thead>
-    <tr><th>Status</th><th>Device</th><th>Local Port</th><th>Neighbor</th></tr>
+    <tr><th>Status</th><th>Device</th><th>Local Port</th><th>Neighbor Device</th><th>Neighbor Port</th></tr>
   </thead>
   <tbody>
     {% for row in diff_rows %}
@@ -217,11 +223,14 @@ th.filter-row select:focus { outline: none; border-color: #58a6ff; }
       <td><span class="badge badge-{{ row.status }}">{{ row.status }}</span></td>
       <td>{% if row.t2 %}{{ row.t2.device.display_name }}{% else %}{{ row.t1.device.display_name }}{% endif %}</td>
       <td>{% if row.t2 %}{{ row.t2.local_port }}{% else %}{{ row.t1.local_port }}{% endif %}</td>
-      <td>{% if row.status == 'added' %}{{ row.t2.neighbor_device }} / {{ row.t2.neighbor_port }}
-        {% elif row.status == 'removed' %}{{ row.t1.neighbor_device }} / {{ row.t1.neighbor_port }}
-        {% else %}{{ row.t1.neighbor_device }} / {{ row.t1.neighbor_port }} <span class="hl">›</span> {{ row.t2.neighbor_device }} / {{ row.t2.neighbor_port }}{% endif %}</td>
+      <td>{% if row.status == 'added' %}{{ row.t2.neighbor_device }}
+        {% elif row.status == 'removed' %}{{ row.t1.neighbor_device }}
+        {% else %}{% if row.t1.neighbor_device != row.t2.neighbor_device %}{{ row.t1.neighbor_device }} <span class="hl">›</span> {{ row.t2.neighbor_device }}{% else %}{{ row.t2.neighbor_device }}{% endif %}{% endif %}</td>
+      <td>{% if row.status == 'added' %}{{ row.t2.neighbor_port }}
+        {% elif row.status == 'removed' %}{{ row.t1.neighbor_port }}
+        {% else %}{% if row.t1.neighbor_port != row.t2.neighbor_port %}{{ row.t1.neighbor_port }} <span class="hl">›</span> {{ row.t2.neighbor_port }}{% else %}{{ row.t2.neighbor_port }}{% endif %}{% endif %}</td>
     </tr>
-    {% empty %}<tr><td colspan="4"><span class="empty">No LLDP changes between these timestamps.</span></td></tr>{% endfor %}
+    {% empty %}<tr><td colspan="5"><span class="empty">No LLDP changes between these timestamps.</span></td></tr>{% endfor %}
   </tbody>
 </table>
 {% endif %}
