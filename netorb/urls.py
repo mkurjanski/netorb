@@ -1,0 +1,26 @@
+from django.urls import include, path
+from rest_framework.routers import DefaultRouter
+
+from . import views
+
+router = DefaultRouter()
+router.register("interfaces", views.InterfaceViewSet, basename="interface")
+router.register("routes", views.IPv4RouteViewSet, basename="route")
+
+urlpatterns = [
+    path("", views.home, name="home"),
+    path("latest/", views.latest, name="latest"),
+    path("interfaces/", views.InterfaceListView.as_view(), name="interfaces"),
+    path("routes/", views.RouteListView.as_view(), name="routes"),
+    path("arp/", views.ArpEntryListView.as_view(), name="arp"),
+    path("bgp-sessions/", views.BgpSessionListView.as_view(), name="bgp-sessions"),
+    path("history/", views.history, name="history"),
+    path("diff/", views.diff, name="diff"),
+    path("topology/", views.topology, name="topology"),
+    path("path-tracer/", views.path_tracer, name="path-tracer"),
+    path("logs/", views.log_page, name="log-page"),
+    path("tasks/", views.tasks, name="tasks"),
+    path("poll-results/", views.poll_results, name="poll-results"),
+    path("logs/stream/", views.log_stream, name="log-stream"),
+    path("api/", include(router.urls)),
+]

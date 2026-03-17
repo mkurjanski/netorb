@@ -1,0 +1,139 @@
+{% extends "netorb/base.html" %}
+
+{% block title %}Path Tracer — netorb{% endblock %}
+
+{% block extra_styles %}
+.tracer-form {
+  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+  padding: .6rem 1.25rem; background: #161b22; border-bottom: 1px solid #30363d;
+}
+.tracer-form label { color: #8b949e; font-size: .8rem; white-space: nowrap; }
+.tracer-form select, .tracer-form input[type="text"] {
+  background: #0d1117; color: #c9d1d9;
+  border: 1px solid #30363d; border-radius: 4px;
+  padding: .25rem .5rem; font-family: monospace; font-size: 12px;
+}
+.tracer-form select:focus, .tracer-form input[type="text"]:focus {
+  outline: none; border-color: #58a6ff;
+}
+.tracer-form button {
+  background: #21262d; color: #c9d1d9; border: 1px solid #30363d;
+  border-radius: 4px; padding: .25rem .75rem; font-family: monospace;
+  font-size: 12px; cursor: pointer;
+}
+.tracer-form button:hover { background: #30363d; }
+
+.path-card {
+  background: #161b22; border: 1px solid #30363d; border-radius: 6px;
+  padding: 1rem 1.25rem; margin-bottom: 1rem;
+}
+.path-header {
+  color: #8b949e; font-size: .75rem; margin-bottom: .75rem;
+  letter-spacing: .05em; text-transform: uppercase;
+}
+
+.hop-list { display: flex; flex-direction: column; gap: 0; }
+
+.hop-box {
+  display: flex; align-items: center; gap: .75rem;
+  background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
+  padding: .5rem .75rem;
+}
+.hop-device {
+  font-weight: 600; color: #c9d1d9; min-width: 60px;
+}
+.hop-detail { display: flex; align-items: center; gap: .5rem; color: #8b949e; font-size: .8rem; }
+.hop-detail .label { color: #484f58; font-size: .7rem; text-transform: uppercase; }
+.hop-detail .iface { color: #58a6ff; }
+.hop-detail .prefix { color: #d2a8ff; }
+.hop-detail .sep { color: #30363d; margin: 0 .15rem; }
+
+.hop-reason { font-style: italic; font-size: .8rem; }
+.hop-reason.terminal { color: #f85149; }
+.hop-reason.connected { color: #3fb950; }
+.hop-reason.warning { color: #e3b341; }
+
+.hop-arrow {
+  display: flex; align-items: center;
+  padding: .15rem 0 .15rem 1.5rem;
+  color: #484f58; font-size: .9rem;
+}
+.hop-arrow .arrow-label { color: #8b949e; font-size: .7rem; margin-left: .4rem; }
+
+.empty { color: #484f58; }
+.summary { color: #8b949e; font-size: .8rem; margin-bottom: 1rem; }
+{% endblock %}
+
+{% block content %}
+<form method="get" class="tracer-form">
+  <label>Source:</label>
+  <select name="source">
+    <option value="">— select device —</option>
+    {% for d in devices %}
+      <option value="{{ d.ip_address }}" {% if source_ip == d.ip_address %}selected{% endif %}>{{ d.display_name }}</option>
+    {% endfor %}
+  </select>
+
+  <label>Destination IP:</label>
+  <input type="text" name="destination" value="{{ dest_ip }}" placeholder="e.g. 10.0.0.1">
+
+  <button type="submit">Run Trace</button>
+</form>
+
+<main>
+{% if paths is not None %}
+  {% if paths %}
+  <p class="summary">{{ paths|length }} path{{ paths|length|pluralize }} found from
+    {% for d in devices %}{% if d.ip_address == source_ip %}{{ d.display_name }}{% endif %}{% endfor %}
+    to {{ dest_ip }}
+  </p>
+
+  {% for path in paths %}
+  <div class="path-card">
+    <div class="path-header">Path {{ forloop.counter }}</div>
+    <div class="hop-list">
+      {% for hop in path %}
+        <div class="hop-box">
+          <span class="hop-device">{{ hop.device.display_name }}</span>
+          <div class="hop-detail">
+            {% if hop.inbound_iface %}
+              <span class="label">in:</span>
+              <span class="iface">{{ hop.inbound_iface }}</span>
+              <span class="sep">|</span>
+            {% endif %}
+            {% if hop.prefix %}
+              <span class="label">route:</span>
+              <span class="prefix">{{ hop.prefix }}</span>
+            {% endif %}
+            {% if hop.outbound_iface %}
+              <span class="sep">|</span>
+              <span class="label">out:</span>
+              <span class="iface">{{ hop.outbound_iface }}</span>
+            {% endif %}
+          </div>
+          {% if hop.reason %}
+            <span class="hop-reason {% if hop.reason == 'directly connected' or hop.reason == 'destination is local' %}connected{% elif hop.reason == 'no route' or hop.reason == 'loop detected' %}terminal{% else %}warning{% endif %}">
+              {{ hop.reason }}
+            </span>
+          {% endif %}
+        </div>
+
+        {% if hop.next_hop and not forloop.last %}
+          <div class="hop-arrow">&#8595; <span class="arrow-label">{{ hop.next_hop }}</span></div>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+
+  {% else %}
+  <p class="empty">No paths found.</p>
+  {% endif %}
+
+{% elif source_ip and dest_ip %}
+  <p class="empty">Source device not found.</p>
+{% else %}
+  <p class="empty">Select a source device and enter a destination IP to trace the path.</p>
+{% endif %}
+</main>
+{% endblock %}

@@ -1,0 +1,235 @@
+{% extends "netorb/base.html" %}
+
+{% block title %}Diff — netorb{% endblock %}
+
+{% block extra_styles %}
+.tabs {
+  display: flex; gap: 0;
+  padding: 0 1.25rem; background: #161b22; border-bottom: 1px solid #30363d;
+}
+.tabs a {
+  color: #8b949e; text-decoration: none;
+  padding: .5rem 1rem; border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.tabs a:hover { color: #c9d1d9; }
+.tabs a.active { color: #c9d1d9; border-bottom-color: #58a6ff; }
+
+.time-form {
+  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+  padding: .6rem 1.25rem; background: #161b22; border-bottom: 1px solid #30363d;
+}
+.time-form label { color: #8b949e; font-size: .8rem; white-space: nowrap; }
+.time-form input[type="datetime-local"] {
+  background: #0d1117; color: #c9d1d9;
+  border: 1px solid #30363d; border-radius: 4px;
+  padding: .25rem .5rem; font-family: monospace; font-size: 12px;
+}
+.time-form input[type="datetime-local"]:focus { outline: none; border-color: #58a6ff; }
+.time-form .sep { color: #484f58; }
+.time-form button {
+  background: #21262d; color: #c9d1d9; border: 1px solid #30363d;
+  border-radius: 4px; padding: .25rem .75rem; font-family: monospace;
+  font-size: 12px; cursor: pointer;
+}
+.time-form button:hover { background: #30363d; }
+.time-form .now-btn {
+  background: none; border: none; color: #58a6ff;
+  font-size: .75rem; cursor: pointer; padding: 0 .25rem; text-decoration: underline;
+}
+
+.compare-bar {
+  padding: .4rem 1.25rem; background: #0d1117; border-bottom: 1px solid #30363d;
+  color: #8b949e; font-size: .8rem;
+}
+.compare-bar span { color: #c9d1d9; }
+
+table { width: 100%; border-collapse: collapse; }
+th {
+  text-align: left; padding: .4rem .75rem;
+  background: #161b22; color: #8b949e;
+  border-bottom: 1px solid #30363d; font-weight: 600;
+}
+td { padding: .4rem .75rem; border-bottom: 1px solid #21262d; vertical-align: top; }
+tr:hover td { background: #161b22; }
+
+th.filter-row { padding: .3rem .5rem; background: #0d1117; border-bottom: 1px solid #30363d; }
+th.filter-row select {
+  width: 100%; background: #161b22; color: #c9d1d9;
+  border: 1px solid #30363d; border-radius: 4px;
+  padding: .2rem .4rem; font-family: monospace; font-size: 12px;
+}
+th.filter-row select:focus { outline: none; border-color: #58a6ff; }
+
+.badge { display: inline-block; padding: .1rem .45rem; border-radius: 3px; font-size: .75rem; font-weight: 600; }
+.badge-added   { background: #0d3a1e; color: #3fb950; }
+.badge-removed { background: #2d1a1a; color: #f85149; }
+.badge-changed { background: #0d2d4d; color: #58a6ff; }
+.badge-up          { background: #0d3a1e; color: #3fb950; }
+.badge-down        { background: #2d1a1a; color: #f85149; }
+.badge-unknown     { background: #21262d; color: #8b949e; }
+.badge-Established { background: #0d3a1e; color: #3fb950; }
+.badge-Active      { background: #4d3800; color: #e3b341; }
+.badge-Idle        { background: #2d1a1a; color: #f85149; }
+.badge-Connect     { background: #2d1a1a; color: #f85149; }
+.badge-OpenSent    { background: #0d2d4d; color: #58a6ff; }
+.badge-OpenConfirm { background: #0d2d4d; color: #58a6ff; }
+.badge-Unknown     { background: #21262d; color: #8b949e; }
+
+.next-hop { color: #8b949e; }
+.next-hop + .next-hop::before { content: ", "; }
+.dash { color: #484f58; }
+.hl { color: #e3b341; }  /* highlight changed value */
+.empty { color: #484f58; padding: .75rem; display: block; }
+{% endblock %}
+
+{% block content %}
+<form method="get" id="main-form">
+  <input type="hidden" name="tab" value="{{ tab }}">
+
+  <div class="time-form">
+    <label>From (T1, UTC):</label>
+    <input type="datetime-local" id="t1" name="t1" value="{{ t1 }}">
+
+    <span class="sep">→</span>
+
+    <label>To (T2, UTC):</label>
+    <input type="datetime-local" id="t2" name="t2" value="{{ t2 }}">
+    <button type="button" class="now-btn" onclick="document.getElementById('t2').value=new Date().toISOString().slice(0,16)">now</button>
+
+    <button type="submit">Compare</button>
+
+    <span class="sep">|</span>
+    <label>Device:</label>
+    <select name="device">
+      <option value="">— all —</option>
+      {% for d in devices %}<option value="{{ d.ip_address }}" {% if f_device == d.ip_address %}selected{% endif %}>{{ d.display_name }}</option>{% endfor %}
+    </select>
+  </div>
+</form>
+
+<div class="compare-bar">
+  Comparing <span>{{ t1 }} UTC</span> → <span>{{ t2 }} UTC</span>
+  &nbsp;·&nbsp; {{ diff_rows|length }} change{{ diff_rows|length|pluralize }}
+</div>
+
+<div class="tabs">
+  <a href="?tab=interfaces&t1={{ t1 }}&t2={{ t2 }}&device={{ f_device }}"  {% if tab == 'interfaces'  %}class="active"{% endif %}>Interfaces</a>
+  <a href="?tab=routes&t1={{ t1 }}&t2={{ t2 }}&device={{ f_device }}"      {% if tab == 'routes'      %}class="active"{% endif %}>Routes</a>
+  <a href="?tab=arp&t1={{ t1 }}&t2={{ t2 }}&device={{ f_device }}"         {% if tab == 'arp'         %}class="active"{% endif %}>ARP</a>
+  <a href="?tab=bgp_sessions&t1={{ t1 }}&t2={{ t2 }}&device={{ f_device }}"{% if tab == 'bgp_sessions'%}class="active"{% endif %}>BGP Sessions</a>
+  <a href="?tab=lldp&t1={{ t1 }}&t2={{ t2 }}&device={{ f_device }}"         {% if tab == 'lldp'         %}class="active"{% endif %}>LLDP</a>
+</div>
+
+<main>
+{% if tab == 'interfaces' %}
+<table>
+  <thead>
+    <tr><th>Status</th><th>Device</th><th>Interface</th><th>Primary IP</th><th>Oper Status</th></tr>
+  </thead>
+  <tbody>
+    {% for row in diff_rows %}
+    <tr>
+      <td><span class="badge badge-{{ row.status }}">{{ row.status }}</span></td>
+      <td>{% if row.t2 %}{{ row.t2.device.display_name }}{% else %}{{ row.t1.device.display_name }}{% endif %}</td>
+      <td>{% if row.t2 %}{{ row.t2.name }}{% else %}{{ row.t1.name }}{% endif %}</td>
+      <td>{% if row.t2 %}{{ row.t2.primary_ip|default:"—" }}{% else %}{{ row.t1.primary_ip|default:"—" }}{% endif %}</td>
+      <td>{% if row.status == 'added' %}<span class="badge badge-{{ row.t2.oper_status }}">{{ row.t2.oper_status }}</span>
+        {% elif row.status == 'removed' %}<span class="badge badge-{{ row.t1.oper_status }}">{{ row.t1.oper_status }}</span>
+        {% else %}<span class="badge badge-{{ row.t1.oper_status }}">{{ row.t1.oper_status }}</span> <span class="hl">›</span> <span class="badge badge-{{ row.t2.oper_status }}">{{ row.t2.oper_status }}</span>{% endif %}</td>
+    </tr>
+    {% empty %}<tr><td colspan="5"><span class="empty">No interface changes between these timestamps.</span></td></tr>{% endfor %}
+  </tbody>
+</table>
+
+{% elif tab == 'routes' %}
+<table>
+  <thead>
+    <tr><th>Status</th><th>Device</th><th>Prefix</th><th>Next Hops</th></tr>
+  </thead>
+  <tbody>
+    {% for row in diff_rows %}
+    <tr>
+      <td><span class="badge badge-{{ row.status }}">{{ row.status }}</span></td>
+      <td>{% if row.t2 %}{{ row.t2.device.display_name }}{% else %}{{ row.t1.device.display_name }}{% endif %}</td>
+      <td>{% if row.t2 %}{{ row.t2.prefix }}{% else %}{{ row.t1.prefix }}{% endif %}</td>
+      <td>{% if row.status == 'added' %}{% for nh in row.t2.next_hops %}<span class="next-hop">{{ nh.nexthop }} via {{ nh.interface }}</span>{% empty %}<span class="dash">directly connected</span>{% endfor %}
+        {% elif row.status == 'removed' %}{% for nh in row.t1.next_hops %}<span class="next-hop">{{ nh.nexthop }} via {{ nh.interface }}</span>{% empty %}<span class="dash">directly connected</span>{% endfor %}
+        {% else %}{% for nh in row.t1.next_hops %}<span class="next-hop">{{ nh.nexthop }} via {{ nh.interface }}</span>{% endfor %} <span class="hl">›</span> {% for nh in row.t2.next_hops %}<span class="next-hop">{{ nh.nexthop }} via {{ nh.interface }}</span>{% endfor %}{% endif %}</td>
+    </tr>
+    {% empty %}<tr><td colspan="4"><span class="empty">No route changes between these timestamps.</span></td></tr>{% endfor %}
+  </tbody>
+</table>
+
+{% elif tab == 'arp' %}
+<table>
+  <thead>
+    <tr><th>Status</th><th>Device</th><th>IP Address</th><th>MAC</th><th>Interface</th></tr>
+  </thead>
+  <tbody>
+    {% for row in diff_rows %}
+    <tr>
+      <td><span class="badge badge-{{ row.status }}">{{ row.status }}</span></td>
+      <td>{% if row.t2 %}{{ row.t2.device.display_name }}{% else %}{{ row.t1.device.display_name }}{% endif %}</td>
+      <td>{% if row.t2 %}{{ row.t2.ip_address }}{% else %}{{ row.t1.ip_address }}{% endif %}</td>
+      <td>{% if row.status == 'added' %}<span style="color:#d2a8ff">{{ row.t2.mac_address }}</span>
+        {% elif row.status == 'removed' %}<span style="color:#d2a8ff">{{ row.t1.mac_address }}</span>
+        {% else %}{% if row.t1.mac_address != row.t2.mac_address %}<span style="color:#d2a8ff">{{ row.t1.mac_address }}</span> <span class="hl">›</span> <span style="color:#d2a8ff">{{ row.t2.mac_address }}</span>{% else %}<span style="color:#d2a8ff">{{ row.t2.mac_address }}</span>{% endif %}{% endif %}</td>
+      <td>{% if row.status == 'added' %}{{ row.t2.interface }}
+        {% elif row.status == 'removed' %}{{ row.t1.interface }}
+        {% else %}{% if row.t1.interface != row.t2.interface %}{{ row.t1.interface }} <span class="hl">›</span> {{ row.t2.interface }}{% else %}{{ row.t2.interface }}{% endif %}{% endif %}</td>
+    </tr>
+    {% empty %}<tr><td colspan="5"><span class="empty">No ARP changes between these timestamps.</span></td></tr>{% endfor %}
+  </tbody>
+</table>
+
+{% elif tab == 'bgp_sessions' %}
+<table>
+  <thead>
+    <tr><th>Status</th><th>Device</th><th>VRF</th><th>Peer IP</th><th>Peer ASN</th><th>State</th><th>Pfx Rcvd</th><th>Pfx Acc</th></tr>
+  </thead>
+  <tbody>
+    {% for row in diff_rows %}
+    <tr>
+      <td><span class="badge badge-{{ row.status }}">{{ row.status }}</span></td>
+      <td>{% if row.t2 %}{{ row.t2.device.display_name }}{% else %}{{ row.t1.device.display_name }}{% endif %}</td>
+      <td>{% if row.t2 %}{{ row.t2.vrf }}{% else %}{{ row.t1.vrf }}{% endif %}</td>
+      <td>{% if row.t2 %}{{ row.t2.peer_ip }}{% else %}{{ row.t1.peer_ip }}{% endif %}</td>
+      <td>{% if row.t2 %}{{ row.t2.peer_asn }}{% else %}{{ row.t1.peer_asn }}{% endif %}</td>
+      <td>{% if row.status == 'added' %}<span class="badge badge-{{ row.t2.peer_state }}">{{ row.t2.peer_state }}</span>
+        {% elif row.status == 'removed' %}<span class="badge badge-{{ row.t1.peer_state }}">{{ row.t1.peer_state }}</span>
+        {% else %}{% if row.t1.peer_state != row.t2.peer_state %}<span class="badge badge-{{ row.t1.peer_state }}">{{ row.t1.peer_state }}</span> <span class="hl">›</span> <span class="badge badge-{{ row.t2.peer_state }}">{{ row.t2.peer_state }}</span>{% else %}<span class="badge badge-{{ row.t2.peer_state }}">{{ row.t2.peer_state }}</span>{% endif %}{% endif %}</td>
+      <td>{% if row.status == 'added' %}{{ row.t2.prefixes_received }}
+        {% elif row.status == 'removed' %}{{ row.t1.prefixes_received }}
+        {% else %}{% if row.t1.prefixes_received != row.t2.prefixes_received %}{{ row.t1.prefixes_received }} <span class="hl">›</span> {{ row.t2.prefixes_received }}{% else %}{{ row.t2.prefixes_received }}{% endif %}{% endif %}</td>
+      <td>{% if row.status == 'added' %}{{ row.t2.prefixes_accepted }}
+        {% elif row.status == 'removed' %}{{ row.t1.prefixes_accepted }}
+        {% else %}{% if row.t1.prefixes_accepted != row.t2.prefixes_accepted %}{{ row.t1.prefixes_accepted }} <span class="hl">›</span> {{ row.t2.prefixes_accepted }}{% else %}{{ row.t2.prefixes_accepted }}{% endif %}{% endif %}</td>
+    </tr>
+    {% empty %}<tr><td colspan="8"><span class="empty">No BGP session changes between these timestamps.</span></td></tr>{% endfor %}
+  </tbody>
+</table>
+{% elif tab == 'lldp' %}
+<table>
+  <thead>
+    <tr><th>Status</th><th>Device</th><th>Local Port</th><th>Neighbor Device</th><th>Neighbor Port</th></tr>
+  </thead>
+  <tbody>
+    {% for row in diff_rows %}
+    <tr>
+      <td><span class="badge badge-{{ row.status }}">{{ row.status }}</span></td>
+      <td>{% if row.t2 %}{{ row.t2.device.display_name }}{% else %}{{ row.t1.device.display_name }}{% endif %}</td>
+      <td>{% if row.t2 %}{{ row.t2.local_port }}{% else %}{{ row.t1.local_port }}{% endif %}</td>
+      <td>{% if row.status == 'added' %}{{ row.t2.neighbor_device }}
+        {% elif row.status == 'removed' %}{{ row.t1.neighbor_device }}
+        {% else %}{% if row.t1.neighbor_device != row.t2.neighbor_device %}{{ row.t1.neighbor_device }} <span class="hl">›</span> {{ row.t2.neighbor_device }}{% else %}{{ row.t2.neighbor_device }}{% endif %}{% endif %}</td>
+      <td>{% if row.status == 'added' %}{{ row.t2.neighbor_port }}
+        {% elif row.status == 'removed' %}{{ row.t1.neighbor_port }}
+        {% else %}{% if row.t1.neighbor_port != row.t2.neighbor_port %}{{ row.t1.neighbor_port }} <span class="hl">›</span> {{ row.t2.neighbor_port }}{% else %}{{ row.t2.neighbor_port }}{% endif %}{% endif %}</td>
+    </tr>
+    {% empty %}<tr><td colspan="5"><span class="empty">No LLDP changes between these timestamps.</span></td></tr>{% endfor %}
+  </tbody>
+</table>
+{% endif %}
+</main>
+{% endblock %}

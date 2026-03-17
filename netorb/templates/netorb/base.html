@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{% block title %}netorb{% endblock %}</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body { background: #0d1117; color: #c9d1d9; font-family: monospace; font-size: 13px; }
+
+    header {
+      display: flex; align-items: center; gap: 1rem;
+      padding: .75rem 1.25rem; background: #161b22; border-bottom: 1px solid #30363d;
+    }
+    header h1 { font-size: 1rem; font-weight: 600; }
+
+    nav {
+      display: flex; gap: .5rem; align-items: center;
+      padding: .5rem 1.25rem; background: #161b22; border-bottom: 1px solid #30363d;
+    }
+    nav a {
+      color: #58a6ff; text-decoration: none;
+      padding: .2rem .6rem; border-radius: 4px;
+    }
+    nav a:hover { background: #21262d; }
+    nav a.active { color: #c9d1d9; background: #21262d; }
+
+    main { padding: 1.5rem 1.25rem; }
+
+    {% block extra_styles %}{% endblock %}
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>netorb</h1>
+</header>
+
+{% with url_name=request.resolver_match.url_name %}
+<nav>
+  <a href="/" {% if url_name == 'home' %}class="active"{% endif %}>Home</a>
+  <a href="/latest/{% if tab %}?tab={{ tab }}{% endif %}" {% if url_name == 'latest' %}class="active"{% endif %}>Latest</a>
+  <a href="/history/{% if tab %}?tab={{ tab }}{% endif %}" {% if url_name == 'history' %}class="active"{% endif %}>History</a>
+  <a href="/diff/{% if tab %}?tab={{ tab }}{% endif %}" {% if url_name == 'diff' %}class="active"{% endif %}>Diff</a>
+  <a href="/topology/" {% if url_name == 'topology' %}class="active"{% endif %}>Topology</a>
+  <a href="/path-tracer/" {% if url_name == 'path-tracer' %}class="active"{% endif %}>Path Tracer</a>
+  <a href="/logs/" {% if url_name == 'log-page' %}class="active"{% endif %}>Logs</a>
+  <a href="/poll-results/" {% if url_name == 'poll-results' %}class="active"{% endif %}>Poll Results</a>
+  <a href="/tasks/" {% if url_name == 'tasks' %}class="active"{% endif %}>Tasks</a>
+  <a href="/admin/">Admin</a>
+</nav>
+{% endwith %}
+
+{% block content %}{% endblock %}
+
+{% block extra_scripts %}{% endblock %}
+
+</body>
+</html>

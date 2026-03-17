@@ -1,0 +1,11 @@
+.env
+.venv/
+.vscode/
+clab/
+__pycache__/
+*.pyc
+*.pyo
+db.sqlite3
+staticfiles/
+.pytest_cache/
+*.tar.xz

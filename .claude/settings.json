@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"from netorb.views import topology; print\\(''OK''\\)\")",
+      "Bash(python3 -c \"import django; import os; os.environ.setdefault\\(''DJANGO_SETTINGS_MODULE'', ''config.settings''\\); django.setup\\(\\); from netorb.views import topology; print\\(''OK''\\)\")",
+      "Bash(ls /home/mati/netorb/.venv/bin/python*)",
+      "Bash(.venv/bin/python -c \"import django; import os; os.environ.setdefault\\(''DJANGO_SETTINGS_MODULE'', ''config.settings''\\); django.setup\\(\\); from netorb.views import topology; print\\(''OK''\\)\")",
+      "Bash(.venv/bin/pytest --tb=short -q)"
+    ]
+  }
+}

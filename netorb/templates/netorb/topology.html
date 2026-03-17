@@ -1,0 +1,182 @@
+{% extends "netorb/base.html" %}
+
+{% block title %}Topology — netorb{% endblock %}
+
+{% block extra_styles %}
+.toolbar {
+  display: flex; align-items: center; gap: .75rem;
+  padding: .5rem 1.25rem; background: #161b22; border-bottom: 1px solid #30363d;
+}
+.toolbar button {
+  background: #21262d; color: #c9d1d9; border: 1px solid #30363d;
+  border-radius: 4px; padding: .3rem .75rem; font-family: monospace;
+  font-size: 12px; cursor: pointer;
+}
+.toolbar button:hover { background: #30363d; }
+.toolbar .status { color: #8b949e; font-size: .75rem; }
+
+#topo-canvas {
+  width: 100%; height: calc(100vh - 140px);
+  background: #0d1117; display: block;
+}
+
+.node-label {
+  fill: #c9d1d9; font-family: monospace; font-size: 11px;
+  pointer-events: none; text-anchor: middle;
+}
+.port-label {
+  fill: #8b949e; font-family: monospace; font-size: 9px;
+  pointer-events: none;
+}
+.link { stroke: #30363d; stroke-width: 1.5; }
+.link:hover { stroke: #58a6ff; }
+.node-circle { cursor: grab; }
+.node-circle:active { cursor: grabbing; }
+
+.tooltip {
+  position: absolute; background: #161b22; color: #c9d1d9;
+  border: 1px solid #30363d; border-radius: 4px;
+  padding: .4rem .6rem; font-family: monospace; font-size: 11px;
+  pointer-events: none; display: none; z-index: 10;
+  white-space: nowrap;
+}
+{% endblock %}
+
+{% block content %}
+<div class="toolbar">
+  <button onclick="refresh()">Refresh</button>
+  <span class="status" id="status"></span>
+</div>
+<svg id="topo-canvas"></svg>
+<div class="tooltip" id="tooltip"></div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+const nodes = {{ nodes_json|safe }};
+const edges = {{ edges_json|safe }};
+
+function refresh() {
+  window.location.reload();
+}
+
+document.getElementById('status').textContent =
+  nodes.length + ' devices, ' + edges.length + ' links';
+
+const svg = d3.select('#topo-canvas');
+const width = svg.node().clientWidth;
+const height = svg.node().clientHeight;
+
+svg.attr('viewBox', [0, 0, width, height]);
+
+// Zoom
+const g = svg.append('g');
+svg.call(d3.zoom()
+  .scaleExtent([0.2, 5])
+  .on('zoom', (e) => g.attr('transform', e.transform))
+);
+
+const simulation = d3.forceSimulation(nodes)
+  .force('link', d3.forceLink(edges).id(d => d.id).distance(150))
+  .force('charge', d3.forceManyBody().strength(-400))
+  .force('center', d3.forceCenter(width / 2, height / 2))
+  .force('collision', d3.forceCollide(40));
+
+// Links
+const link = g.append('g')
+  .selectAll('line')
+  .data(edges)
+  .join('line')
+  .attr('class', 'link');
+
+// Port labels
+const portLabelSrc = g.append('g')
+  .selectAll('text')
+  .data(edges)
+  .join('text')
+  .attr('class', 'port-label')
+  .text(d => d.source_port);
+
+const portLabelTgt = g.append('g')
+  .selectAll('text')
+  .data(edges)
+  .join('text')
+  .attr('class', 'port-label')
+  .text(d => d.target_port);
+
+// Nodes
+const node = g.append('g')
+  .selectAll('g')
+  .data(nodes)
+  .join('g')
+  .call(d3.drag()
+    .on('start', dragstarted)
+    .on('drag', dragged)
+    .on('end', dragended)
+  );
+
+node.append('circle')
+  .attr('class', 'node-circle')
+  .attr('r', 18)
+  .attr('fill', '#0d2d4d')
+  .attr('stroke', '#58a6ff')
+  .attr('stroke-width', 1.5);
+
+node.append('text')
+  .attr('class', 'node-label')
+  .attr('dy', 30)
+  .text(d => d.label);
+
+// Tooltip
+const tooltip = document.getElementById('tooltip');
+node.on('mouseover', (event, d) => {
+  tooltip.style.display = 'block';
+  tooltip.innerHTML = '<b>' + d.label + '</b>' + (d.ip ? '<br>' + d.ip : '');
+})
+.on('mousemove', (event) => {
+  tooltip.style.left = (event.pageX + 12) + 'px';
+  tooltip.style.top = (event.pageY - 12) + 'px';
+})
+.on('mouseout', () => { tooltip.style.display = 'none'; });
+
+simulation.on('tick', () => {
+  link
+    .attr('x1', d => d.source.x)
+    .attr('y1', d => d.source.y)
+    .attr('x2', d => d.target.x)
+    .attr('y2', d => d.target.y);
+
+  node.attr('transform', d => `translate(${d.x},${d.y})`);
+
+  // Position port labels along the link, near each end
+  portLabelSrc
+    .attr('x', d => d.source.x + (d.target.x - d.source.x) * 0.25)
+    .attr('y', d => d.source.y + (d.target.y - d.source.y) * 0.25 - 5);
+  portLabelTgt
+    .attr('x', d => d.source.x + (d.target.x - d.source.x) * 0.75)
+    .attr('y', d => d.source.y + (d.target.y - d.source.y) * 0.75 - 5);
+});
+
+function dragstarted(event) {
+  if (!event.active) simulation.alphaTarget(0.3).restart();
+  event.subject.fx = event.subject.x;
+  event.subject.fy = event.subject.y;
+}
+function dragged(event) {
+  event.subject.fx = event.x;
+  event.subject.fy = event.y;
+}
+function dragended(event) {
+  if (!event.active) simulation.alphaTarget(0);
+}
+
+// Double-click a node to release it back to the simulation
+node.on('dblclick', (event, d) => {
+  d.fx = null;
+  d.fy = null;
+  simulation.alphaTarget(0.3).restart();
+  setTimeout(() => simulation.alphaTarget(0), 300);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,51 @@
+{% extends "netorb/base.html" %}
+
+{% block title %}Tasks — netorb{% endblock %}
+
+{% block extra_styles %}
+.file-tabs {
+  display: flex; gap: .25rem;
+  padding: .5rem 1.25rem; background: #161b22; border-bottom: 1px solid #30363d;
+}
+.file-tab {
+  color: #8b949e; text-decoration: none;
+  padding: .2rem .75rem; border-radius: 4px; border: 1px solid transparent;
+}
+.file-tab:hover { background: #21262d; color: #c9d1d9; }
+.file-tab.active { border-color: #30363d; color: #c9d1d9; background: #0d1117; }
+
+.code-wrap {
+  padding: 1rem 1.25rem;
+  overflow-x: auto;
+}
+
+table.line-table { width: 100%; border-collapse: collapse; }
+table.line-table td { padding: 0; line-height: 1.6; vertical-align: top; }
+td.ln {
+  color: #484f58; text-align: right; padding-right: 1.25rem;
+  user-select: none; white-space: nowrap; width: 1%;
+}
+td.code { white-space: pre; }
+tr:hover td { background: #161b22; }
+{% endblock %}
+
+{% block content %}
+<div class="file-tabs">
+  {% for f in files %}
+  <a href="?file={{ f.name }}" class="file-tab {% if f.name == active_file %}active{% endif %}">{{ f.name }}</a>
+  {% endfor %}
+</div>
+
+<div class="code-wrap">
+  <table class="line-table">
+    <tbody>
+      {% for line in lines %}
+      <tr>
+        <td class="ln">{{ forloop.counter }}</td>
+        <td class="code">{{ line }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

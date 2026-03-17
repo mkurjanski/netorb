@@ -1,0 +1,101 @@
+{% extends "netorb/base.html" %}
+
+{% block title %}ARP Table — netorb{% endblock %}
+
+{% block extra_styles %}
+table { width: 100%; border-collapse: collapse; }
+th {
+  text-align: left; padding: .4rem .75rem;
+  background: #161b22; color: #8b949e;
+  border-bottom: 1px solid #30363d; font-weight: 600;
+}
+td { padding: .4rem .75rem; border-bottom: 1px solid #21262d; }
+tr:hover td { background: #161b22; }
+
+th.filter-row { padding: .3rem .5rem; background: #0d1117; border-bottom: 1px solid #30363d; }
+th.filter-row input, th.filter-row select {
+  width: 100%; background: #161b22; color: #c9d1d9;
+  border: 1px solid #30363d; border-radius: 4px;
+  padding: .2rem .4rem; font-family: monospace; font-size: 12px;
+}
+th.filter-row input:focus, th.filter-row select:focus {
+  outline: none; border-color: #58a6ff;
+}
+
+.pagination { display: flex; gap: .5rem; align-items: center; padding: 1rem 0; color: #8b949e; }
+.pagination a { color: #58a6ff; text-decoration: none; }
+.empty { color: #484f58; }
+{% endblock %}
+
+{% block content %}
+<main>
+  {% if entries or f_device or f_ip or f_mac or f_interface %}
+  <form method="get" id="filter-form">
+    <table>
+      <thead>
+        <tr>
+          <th>Device</th>
+          <th>IP Address</th>
+          <th>MAC Address</th>
+          <th>Interface</th>
+          <th>Collected</th>
+        </tr>
+        <tr>
+          <th class="filter-row">
+            <select name="device" onchange="this.form.submit()">
+              <option value="">— all —</option>
+              {% for d in devices %}
+                <option value="{{ d.ip_address }}" {% if f_device == d.ip_address %}selected{% endif %}>{{ d.display_name }}</option>
+              {% endfor %}
+            </select>
+          </th>
+          <th class="filter-row">
+            <input type="text" name="ip" value="{{ f_ip }}" placeholder="filter…">
+          </th>
+          <th class="filter-row">
+            <input type="text" name="mac" value="{{ f_mac }}" placeholder="filter…">
+          </th>
+          <th class="filter-row">
+            <input type="text" name="interface" value="{{ f_interface }}" placeholder="filter…">
+          </th>
+          <th class="filter-row"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in entries %}
+        <tr>
+          <td>{{ e.device.display_name }}</td>
+          <td>{{ e.ip_address }}</td>
+          <td style="color:#d2a8ff">{{ e.mac_address }}</td>
+          <td>{{ e.interface }}</td>
+          <td style="color:#484f58">{{ e.collected_at|date:"Y-m-d H:i:s" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="empty" style="padding:.75rem">No ARP entries match the current filters.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </form>
+
+  <div class="pagination">
+    {% if page_obj.has_previous %}
+      <a href="?device={{ f_device }}&ip={{ f_ip }}&mac={{ f_mac }}&interface={{ f_interface }}&page={{ page_obj.previous_page_number }}">← prev</a>
+    {% endif %}
+    <span>page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+      <a href="?device={{ f_device }}&ip={{ f_ip }}&mac={{ f_mac }}&interface={{ f_interface }}&page={{ page_obj.next_page_number }}">next →</a>
+    {% endif %}
+  </div>
+  {% else %}
+  <p class="empty">No ARP entries collected yet.</p>
+  {% endif %}
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  document.querySelectorAll('input[name="ip"], input[name="mac"], input[name="interface"]').forEach(el => {
+    el.addEventListener('keydown', e => { if (e.key === 'Enter') e.target.form.submit(); });
+  });
+</script>
+{% endblock %}

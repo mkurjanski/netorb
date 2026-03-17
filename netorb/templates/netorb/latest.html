@@ -1,0 +1,224 @@
+{% extends "netorb/base.html" %}
+
+{% block title %}Latest — netorb{% endblock %}
+
+{% block extra_styles %}
+.tabs {
+  display: flex; gap: 0;
+  padding: 0 1.25rem; background: #161b22; border-bottom: 1px solid #30363d;
+}
+.tabs a {
+  color: #8b949e; text-decoration: none;
+  padding: .5rem 1rem; border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.tabs a:hover { color: #c9d1d9; }
+.tabs a.active { color: #c9d1d9; border-bottom-color: #58a6ff; }
+
+table { width: 100%; border-collapse: collapse; }
+th {
+  text-align: left; padding: .4rem .75rem;
+  background: #161b22; color: #8b949e;
+  border-bottom: 1px solid #30363d; font-weight: 600;
+}
+td { padding: .4rem .75rem; border-bottom: 1px solid #21262d; vertical-align: top; }
+tr:hover td { background: #161b22; }
+
+th.filter-row { padding: .3rem .5rem; background: #0d1117; border-bottom: 1px solid #30363d; }
+th.filter-row input, th.filter-row select {
+  width: 100%; background: #161b22; color: #c9d1d9;
+  border: 1px solid #30363d; border-radius: 4px;
+  padding: .2rem .4rem; font-family: monospace; font-size: 12px;
+}
+th.filter-row input:focus, th.filter-row select:focus { outline: none; border-color: #58a6ff; }
+
+.badge { display: inline-block; padding: .1rem .45rem; border-radius: 3px; font-size: .75rem; font-weight: 600; }
+.badge-up           { background: #0d3a1e; color: #3fb950; }
+.badge-down         { background: #2d1a1a; color: #f85149; }
+.badge-unknown      { background: #21262d; color: #8b949e; }
+.badge-Established  { background: #0d3a1e; color: #3fb950; }
+.badge-Active       { background: #4d3800; color: #e3b341; }
+.badge-Idle         { background: #2d1a1a; color: #f85149; }
+.badge-Connect      { background: #2d1a1a; color: #f85149; }
+.badge-OpenSent     { background: #0d2d4d; color: #58a6ff; }
+.badge-OpenConfirm  { background: #0d2d4d; color: #58a6ff; }
+.badge-Unknown      { background: #21262d; color: #8b949e; }
+.next-hop { color: #8b949e; }
+.next-hop + .next-hop::before { content: ", "; }
+
+.empty { color: #484f58; }
+{% endblock %}
+
+{% block content %}
+<div class="tabs">
+  <a href="?tab=interfaces" {% if tab == 'interfaces' %}class="active"{% endif %}>Interfaces</a>
+  <a href="?tab=routes"     {% if tab == 'routes'     %}class="active"{% endif %}>Routes</a>
+  <a href="?tab=arp"        {% if tab == 'arp'        %}class="active"{% endif %}>ARP</a>
+  <a href="?tab=bgp_sessions" {% if tab == 'bgp_sessions' %}class="active"{% endif %}>BGP Sessions</a>
+  <a href="?tab=lldp"         {% if tab == 'lldp'         %}class="active"{% endif %}>LLDP</a>
+</div>
+
+<form method="get" id="filter-form">
+  <input type="hidden" name="tab" value="{{ tab }}">
+
+  {% if tab == 'interfaces' %}
+  <main>
+  <table>
+    <thead>
+      <tr><th>Device</th><th>Interface</th><th>Primary IP</th><th>Status</th><th>Collected</th></tr>
+      <tr>
+        <th class="filter-row"><select name="device" onchange="this.form.submit()"><option value="">— all —</option>{% for d in devices %}<option value="{{ d.ip_address }}" {% if f_device == d.ip_address %}selected{% endif %}>{{ d.display_name }}</option>{% endfor %}</select></th>
+        <th class="filter-row"><input type="text" name="name" value="{{ f_name }}" placeholder="filter…"></th>
+        <th class="filter-row"></th>
+        <th class="filter-row">
+          <select name="status" onchange="this.form.submit()">
+            <option value="">— all —</option>
+            {% for v, l in status_choices %}<option value="{{ v }}" {% if f_status == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+          </select>
+        </th>
+        <th class="filter-row"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for iface in objects %}
+      <tr>
+        <td>{{ iface.device.display_name }}</td>
+        <td>{{ iface.name }}</td>
+        <td>{% if iface.primary_ip %}{{ iface.primary_ip }}{% else %}<span style="color:#484f58">—</span>{% endif %}</td>
+        <td><span class="badge badge-{{ iface.oper_status }}">{{ iface.get_oper_status_display }}</span></td>
+        <td style="color:#484f58">{{ iface.collected_at|date:"Y-m-d H:i:s" }}</td>
+      </tr>
+      {% empty %}<tr><td colspan="5" class="empty" style="padding:.75rem">No interfaces found.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+  </main>
+
+  {% elif tab == 'routes' %}
+  <main>
+  <table>
+    <thead>
+      <tr><th>Device</th><th>Prefix</th><th>Next Hops</th><th>Collected</th></tr>
+      <tr>
+        <th class="filter-row"><select name="device" onchange="this.form.submit()"><option value="">— all —</option>{% for d in devices %}<option value="{{ d.ip_address }}" {% if f_device == d.ip_address %}selected{% endif %}>{{ d.display_name }}</option>{% endfor %}</select></th>
+        <th class="filter-row"><input type="text" name="prefix" value="{{ f_prefix }}" placeholder="filter…"></th>
+        <th class="filter-row"><input type="text" name="nexthop" value="{{ f_nexthop }}" placeholder="filter…"></th>
+        <th class="filter-row"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for route in objects %}
+      <tr>
+        <td>{{ route.device.display_name }}</td>
+        <td>{{ route.prefix }}</td>
+        <td>
+          {% for nh in route.next_hops %}<span class="next-hop">{{ nh.nexthop }} via {{ nh.interface }}</span>
+          {% empty %}<span style="color:#484f58">directly connected</span>{% endfor %}
+        </td>
+        <td style="color:#484f58">{{ route.collected_at|date:"Y-m-d H:i:s" }}</td>
+      </tr>
+      {% empty %}<tr><td colspan="4" class="empty" style="padding:.75rem">No routes found.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+  </main>
+
+  {% elif tab == 'arp' %}
+  <main>
+  <table>
+    <thead>
+      <tr><th>Device</th><th>IP Address</th><th>MAC Address</th><th>Interface</th><th>Collected</th></tr>
+      <tr>
+        <th class="filter-row"><select name="device" onchange="this.form.submit()"><option value="">— all —</option>{% for d in devices %}<option value="{{ d.ip_address }}" {% if f_device == d.ip_address %}selected{% endif %}>{{ d.display_name }}</option>{% endfor %}</select></th>
+        <th class="filter-row"><input type="text" name="ip" value="{{ f_ip }}" placeholder="filter…"></th>
+        <th class="filter-row"><input type="text" name="mac" value="{{ f_mac }}" placeholder="filter…"></th>
+        <th class="filter-row"><input type="text" name="interface" value="{{ f_interface }}" placeholder="filter…"></th>
+        <th class="filter-row"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in objects %}
+      <tr>
+        <td>{{ e.device.display_name }}</td>
+        <td>{{ e.ip_address }}</td>
+        <td style="color:#d2a8ff">{{ e.mac_address }}</td>
+        <td>{{ e.interface }}</td>
+        <td style="color:#484f58">{{ e.collected_at|date:"Y-m-d H:i:s" }}</td>
+      </tr>
+      {% empty %}<tr><td colspan="5" class="empty" style="padding:.75rem">No ARP entries found.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+  </main>
+
+  {% elif tab == 'bgp_sessions' %}
+  <main>
+  <table>
+    <thead>
+      <tr><th>Device</th><th>VRF</th><th>Peer IP</th><th>Peer ASN</th><th>State</th><th>Pfx Rcvd</th><th>Pfx Acc</th><th>Up/Down</th><th>Collected</th></tr>
+      <tr>
+        <th class="filter-row"><select name="device" onchange="this.form.submit()"><option value="">— all —</option>{% for d in devices %}<option value="{{ d.ip_address }}" {% if f_device == d.ip_address %}selected{% endif %}>{{ d.display_name }}</option>{% endfor %}</select></th>
+        <th class="filter-row"><input type="text" name="vrf" value="{{ f_vrf }}" placeholder="filter…"></th>
+        <th class="filter-row"><input type="text" name="peer_ip" value="{{ f_peer_ip }}" placeholder="filter…"></th>
+        <th class="filter-row"><input type="text" name="peer_asn" value="{{ f_peer_asn }}" placeholder="filter…"></th>
+        <th class="filter-row">
+          <select name="state" onchange="this.form.submit()">
+            <option value="">— all —</option>
+            {% for v, l in state_choices %}<option value="{{ v }}" {% if f_state == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+          </select>
+        </th>
+        <th class="filter-row"></th><th class="filter-row"></th><th class="filter-row"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in objects %}
+      <tr>
+        <td>{{ s.device.display_name }}</td>
+        <td>{{ s.vrf }}</td>
+        <td>{{ s.peer_ip }}</td>
+        <td>{{ s.peer_asn }}</td>
+        <td><span class="badge badge-{{ s.peer_state }}">{{ s.peer_state }}</span></td>
+        <td>{{ s.prefixes_received }}</td>
+        <td>{{ s.prefixes_accepted }}</td>
+        <td style="color:#484f58">{% if s.updown_change_at %}{{ s.updown_change_at|timesince }}{% else %}—{% endif %}</td>
+        <td style="color:#484f58">{{ s.collected_at|date:"Y-m-d H:i:s" }}</td>
+      </tr>
+      {% empty %}<tr><td colspan="9" class="empty" style="padding:.75rem">No BGP sessions found.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+  </main>
+
+  {% elif tab == 'lldp' %}
+  <main>
+  <table>
+    <thead>
+      <tr><th>Device</th><th>Local Port</th><th>Neighbor Device</th><th>Neighbor Port</th><th>Collected</th></tr>
+      <tr>
+        <th class="filter-row"><select name="device" onchange="this.form.submit()"><option value="">— all —</option>{% for d in devices %}<option value="{{ d.ip_address }}" {% if f_device == d.ip_address %}selected{% endif %}>{{ d.display_name }}</option>{% endfor %}</select></th>
+        <th class="filter-row"><input type="text" name="local_port" value="{{ f_local_port }}" placeholder="filter…"></th>
+        <th class="filter-row"><input type="text" name="neighbor" value="{{ f_neighbor }}" placeholder="filter…"></th>
+        <th class="filter-row"></th>
+        <th class="filter-row"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for n in objects %}
+      <tr>
+        <td>{{ n.device.display_name }}</td>
+        <td>{{ n.local_port }}</td>
+        <td>{{ n.neighbor_device }}</td>
+        <td>{{ n.neighbor_port }}</td>
+        <td style="color:#484f58">{{ n.collected_at|date:"Y-m-d H:i:s" }}</td>
+      </tr>
+      {% empty %}<tr><td colspan="5" class="empty" style="padding:.75rem">No LLDP neighbors found.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+  </main>
+  {% endif %}
+</form>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  document.querySelectorAll('input[type="text"]').forEach(el => {
+    el.addEventListener('keydown', e => { if (e.key === 'Enter') e.target.form.submit(); });
+  });
+</script>
+{% endblock %}
