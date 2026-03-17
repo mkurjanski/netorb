@@ -519,7 +519,6 @@ def diff(request):
             or a.peer_asn != b.peer_asn
             or a.prefixes_received != b.prefixes_received
             or a.prefixes_accepted != b.prefixes_accepted
-            or a.time_of_last_change != b.time_of_last_change
         ))
         if f_device:
             rows = _filter_diff_by_device(rows, f_device)

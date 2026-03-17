@@ -1,4 +1,7 @@
 import pghistory
+from datetime import datetime
+from datetime import timezone as dt_timezone
+
 from django.db import models
 from netfields import CidrAddressField
 
@@ -211,7 +214,7 @@ class PollingTask(models.Model):
     pghistory.InsertEvent(),
     pghistory.UpdateEvent(),
     pghistory.DeleteEvent(),
-    exclude=["collected_at"],
+    exclude=["collected_at", "updown_time"],
 )
 class BgpSession(models.Model):
     class PeerState(models.TextChoices):
@@ -255,10 +258,10 @@ class BgpSession(models.Model):
         default=0,
         help_text="Number of prefixes accepted from this peer.",
     )
-    time_of_last_change = models.DateTimeField(
+    updown_time = models.FloatField(
         null=True,
         blank=True,
-        help_text="When the session last changed state, calculated from device-reported uptime.",
+        help_text="Raw upDownTime value from EOS BGP summary (EOS internal clock at last state change).",
     )
     collected_at = models.DateTimeField(
         auto_now=True,
@@ -275,6 +278,15 @@ class BgpSession(models.Model):
                 name="unique_device_vrf_peer",
             )
         ]
+
+    @property
+    def updown_change_at(self):
+        if self.updown_time is None:
+            return None
+        try:
+            return datetime.fromtimestamp(self.updown_time, tz=dt_timezone.utc)
+        except (OSError, OverflowError, ValueError):
+            return None
 
     def __str__(self):
         return f"{self.device.hostname} / {self.vrf} / {self.peer_ip} ({self.peer_state})"

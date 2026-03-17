@@ -152,7 +152,7 @@ th.filter-row input:focus, th.filter-row select:focus { outline: none; border-co
   <main>
   <table>
     <thead>
-      <tr><th>Device</th><th>VRF</th><th>Peer IP</th><th>Peer ASN</th><th>State</th><th>Pfx Rcvd</th><th>Pfx Acc</th><th>Last Change</th><th>Collected</th></tr>
+      <tr><th>Device</th><th>VRF</th><th>Peer IP</th><th>Peer ASN</th><th>State</th><th>Pfx Rcvd</th><th>Pfx Acc</th><th>Up/Down</th><th>Collected</th></tr>
       <tr>
         <th class="filter-row"><select name="device" onchange="this.form.submit()"><option value="">— all —</option>{% for d in devices %}<option value="{{ d.ip_address }}" {% if f_device == d.ip_address %}selected{% endif %}>{{ d.display_name }}</option>{% endfor %}</select></th>
         <th class="filter-row"><input type="text" name="vrf" value="{{ f_vrf }}" placeholder="filter…"></th>
@@ -164,7 +164,7 @@ th.filter-row input:focus, th.filter-row select:focus { outline: none; border-co
             {% for v, l in state_choices %}<option value="{{ v }}" {% if f_state == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
           </select>
         </th>
-        <th class="filter-row"></th><th class="filter-row"></th><th class="filter-row"></th><th class="filter-row"></th>
+        <th class="filter-row"></th><th class="filter-row"></th><th class="filter-row"></th>
       </tr>
     </thead>
     <tbody>
@@ -177,7 +177,7 @@ th.filter-row input:focus, th.filter-row select:focus { outline: none; border-co
         <td><span class="badge badge-{{ s.peer_state }}">{{ s.peer_state }}</span></td>
         <td>{{ s.prefixes_received }}</td>
         <td>{{ s.prefixes_accepted }}</td>
-        <td style="color:#484f58">{% if s.time_of_last_change %}{{ s.time_of_last_change|date:"Y-m-d H:i:s" }}{% else %}—{% endif %}</td>
+        <td style="color:#484f58">{% if s.updown_change_at %}{{ s.updown_change_at|timesince }}{% else %}—{% endif %}</td>
         <td style="color:#484f58">{{ s.collected_at|date:"Y-m-d H:i:s" }}</td>
       </tr>
       {% empty %}<tr><td colspan="9" class="empty" style="padding:.75rem">No BGP sessions found.</td></tr>{% endfor %}

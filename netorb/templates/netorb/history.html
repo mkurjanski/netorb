@@ -174,7 +174,7 @@ th.filter-row input:focus, th.filter-row select:focus { outline: none; border-co
   <main>
   <table>
     <thead>
-      <tr><th>Time</th><th>Event</th><th>Device</th><th>VRF</th><th>Peer IP</th><th>Peer ASN</th><th>State</th><th>Pfx Rcvd</th><th>Pfx Acc</th><th>Last Change</th></tr>
+      <tr><th>Time</th><th>Event</th><th>Device</th><th>VRF</th><th>Peer IP</th><th>Peer ASN</th><th>State</th><th>Pfx Rcvd</th><th>Pfx Acc</th></tr>
       <tr>
         <th class="filter-row"></th>
         <th class="filter-row">
@@ -195,7 +195,6 @@ th.filter-row input:focus, th.filter-row select:focus { outline: none; border-co
         </th>
         <th class="filter-row"></th>
         <th class="filter-row"></th>
-        <th class="filter-row"></th>
       </tr>
     </thead>
     <tbody>
@@ -210,9 +209,8 @@ th.filter-row input:focus, th.filter-row select:focus { outline: none; border-co
         <td><span class="badge badge-{{ e.peer_state }}">{{ e.peer_state }}</span></td>
         <td>{{ e.prefixes_received }}</td>
         <td>{{ e.prefixes_accepted }}</td>
-        <td style="color:#484f58">{% if e.time_of_last_change %}{{ e.time_of_last_change|date:"Y-m-d H:i:s" }}{% else %}—{% endif %}</td>
       </tr>
-      {% empty %}<tr><td colspan="10" class="empty" style="padding:.75rem">No BGP session events found.</td></tr>{% endfor %}
+      {% empty %}<tr><td colspan="9" class="empty" style="padding:.75rem">No BGP session events found.</td></tr>{% endfor %}
     </tbody>
   </table>
   </main>

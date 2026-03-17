@@ -53,7 +53,6 @@ th.filter-row input:focus, th.filter-row select:focus {
           <th>State</th>
           <th>Pfx Received</th>
           <th>Pfx Accepted</th>
-          <th>Last Change</th>
           <th>Collected</th>
         </tr>
         <tr>
@@ -85,7 +84,6 @@ th.filter-row input:focus, th.filter-row select:focus {
           <th class="filter-row"></th>
           <th class="filter-row"></th>
           <th class="filter-row"></th>
-          <th class="filter-row"></th>
         </tr>
       </thead>
       <tbody>
@@ -98,11 +96,10 @@ th.filter-row input:focus, th.filter-row select:focus {
           <td><span class="badge badge-{{ s.peer_state }}">{{ s.peer_state }}</span></td>
           <td>{{ s.prefixes_received }}</td>
           <td>{{ s.prefixes_accepted }}</td>
-          <td style="color:#484f58">{% if s.time_of_last_change %}{{ s.time_of_last_change|date:"Y-m-d H:i:s" }}{% else %}—{% endif %}</td>
           <td style="color:#484f58">{{ s.collected_at|date:"Y-m-d H:i:s" }}</td>
         </tr>
         {% empty %}
-        <tr><td colspan="9" class="empty" style="padding:.75rem">No BGP sessions match the current filters.</td></tr>
+        <tr><td colspan="8" class="empty" style="padding:.75rem">No BGP sessions match the current filters.</td></tr>
         {% endfor %}
       </tbody>
     </table>

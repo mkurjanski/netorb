@@ -17,7 +17,6 @@ import json
 import logging
 import time
 from contextlib import contextmanager
-from datetime import timedelta
 
 from django.conf import settings
 from django.db.models import Func, IntegerField
@@ -146,11 +145,8 @@ def task_bgp_sessions(task) -> None:
         command_string="show ip bgp summary | json",
     )
     data = json.loads(result[0].result)
-    now = timezone.now()
     for vrf_name, vrf_data in data.get("vrfs", {}).items():
         for peer_ip, peer in vrf_data.get("peers", {}).items():
-            uptime_seconds = peer.get("upDownTime")
-            time_of_last_change = (now - timedelta(seconds=uptime_seconds)) if uptime_seconds else None
             BgpSession.objects.update_or_create(
                 device=device,
                 vrf=vrf_name,
@@ -160,7 +156,7 @@ def task_bgp_sessions(task) -> None:
                     "peer_state": peer.get("peerState", BgpSession.PeerState.UNKNOWN),
                     "prefixes_received": peer.get("prefixReceived", 0),
                     "prefixes_accepted": peer.get("prefixAccepted", 0),
-                    "time_of_last_change": time_of_last_change,
+                    "updown_time": peer.get("upDownTime"),
                 },
             )
 

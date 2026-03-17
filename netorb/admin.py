@@ -60,7 +60,7 @@ class BgpSessionAdmin(admin.ModelAdmin):
     list_display = ("device", "vrf", "peer_ip", "peer_asn", "peer_state", "prefixes_received", "prefixes_accepted", "collected_at")
     list_filter = ("peer_state", "device", "vrf")
     search_fields = ("peer_ip", "device__hostname", "device__ip_address")
-    readonly_fields = ("device", "vrf", "peer_ip", "peer_asn", "peer_state", "prefixes_received", "prefixes_accepted", "time_of_last_change", "collected_at")
+    readonly_fields = ("device", "vrf", "peer_ip", "peer_asn", "peer_state", "prefixes_received", "prefixes_accepted", "collected_at")
 
 
 @admin.register(LldpNeighbor)
